@@ -1,0 +1,100 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: kgpanel-linux-amd64
+            goos: linux
+            goarch: amd64
+            dir: panel
+            pkg: ./cmd/kgpanel
+            ext: ""
+          - target: kgpanel-linux-arm64
+            goos: linux
+            goarch: arm64
+            dir: panel
+            pkg: ./cmd/kgpanel
+            ext: ""
+          - target: kgpanel-windows-amd64
+            goos: windows
+            goarch: amd64
+            dir: panel
+            pkg: ./cmd/kgpanel
+            ext: .exe
+          - target: wings-linux-amd64
+            goos: linux
+            goarch: amd64
+            dir: wings
+            pkg: ./cmd/wings
+            ext: ""
+          - target: wings-linux-arm64
+            goos: linux
+            goarch: arm64
+            dir: wings
+            pkg: ./cmd/wings
+            ext: ""
+          - target: wings-windows-amd64
+            goos: windows
+            goarch: amd64
+            dir: wings
+            pkg: ./cmd/wings
+            ext: .exe
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: ${{ matrix.dir }}/go.sum
+
+      - name: Build
+        working-directory: ${{ matrix.dir }}
+        run: |
+          CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+            go build -trimpath -ldflags="-s -w" \
+            -o ../${{ matrix.target }}${{ matrix.ext }} ${{ matrix.pkg }}
+
+      - name: Compress (linux/mac)
+        if: matrix.goos != 'windows'
+        run: tar -czf ${{ matrix.target }}.tar.gz ${{ matrix.target }}
+
+      - name: Compress (windows)
+        if: matrix.goos == 'windows'
+        run: zip -j ${{ matrix.target }}.zip ${{ matrix.target }}${{ matrix.ext }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: |
+            ${{ matrix.target }}.tar.gz
+            ${{ matrix.target }}.zip
+
+  release:
+    name: Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: assets/**
+          generate_release_notes: true

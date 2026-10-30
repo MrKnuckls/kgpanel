@@ -5,7 +5,7 @@ A clean-room re-implementation of the panel/daemon architecture (Pelican/Pteroda
 **not a fork**: no AGPL code is copied (wings-style daemon design is MIT-compatible; ours is
 original code under MIT).
 
-Runs on **Docker** and **bare Linux**. One static binary per component.
+Runs on **Docker**, **bare Linux**, and **Windows (native .exe)**. One static binary per component.
 
 ```
 ┌─────────────┐   HTTP/WS    ┌─────────────┐   Docker API   ┌──────────────┐
@@ -14,6 +14,22 @@ Runs on **Docker** and **bare Linux**. One static binary per component.
 │  API + auth │ ◄─────────── │  power/fs/  │    lifecycle)  │  (isolated)  │
 └─────────────┘              │  console    │                └──────────────┘
 ```
+
+## Download
+
+Grab prebuilt binaries for Linux (amd64/arm64) and Windows (native `.exe`) from
+the **[Releases](https://github.com/MrKnuckls/kgpanel/releases)** page — or build
+from source (`make build`).
+
+## Install
+
+**Step-by-step guide (like your favorite panel's docs): [`docs/INSTALL.md`](docs/INSTALL.md)**
+
+Covers: requirements → download → panel install (binary + systemd, or Docker
+Compose) → first-run admin setup → wings install (Linux + Windows) → adding
+eggs → deploying a first server → securing, backups, troubleshooting.
+
+No database, no PHP, no Redis — just one binary and a JSON data directory.
 
 ## Quick start (Docker)
 
