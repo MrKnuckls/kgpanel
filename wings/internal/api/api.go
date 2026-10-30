@@ -19,7 +19,7 @@ import (
 
 // Handler wires the wings HTTP API. Auth: X-KG-Token header or ?token= query
 // must equal the configured shared secret (subtle.ConstantTimeCompare-style).
-func Handler(token, dataDir, updateURL string) http.Handler {
+func Handler(token, dataDir, hostDataDir, updateURL string) http.Handler {
 	mux := http.NewServeMux()
 
 	// config: POST /v1/servers/{id}/config {image,startup,stop_command,env,ports,memory_mb,cpu_percent}
@@ -66,7 +66,7 @@ func Handler(token, dataDir, updateURL string) http.Handler {
 				httpError(w, http.StatusBadRequest, "server config missing: "+err.Error())
 				return
 			}
-			if _, err := docker.EnsureExists(ctx, dataDir, id, sp.Image, sp.Env, sp.Ports, sp.MemoryMB, sp.CPUPercent, sp.Startup); err != nil {
+			if _, err := docker.EnsureExists(ctx, hostDataDir, id, sp.Image, sp.Env, sp.Ports, sp.MemoryMB, sp.CPUPercent, sp.Startup); err != nil {
 				httpError(w, http.StatusBadGateway, err.Error())
 				return
 			}

@@ -30,6 +30,10 @@ services:
       KGWINGS_LISTEN: ":8081"
       KGWINGS_TOKEN: "${KGWINGS_TOKEN:-change-me-in-.env}"
       KGWINGS_DATA: "/data"
+      # host-visible path for docker -v mounts: must be the wings-data volume's
+      # real path on the docker HOST (e.g. /mnt/user/apps/kgpanel/wings-data on
+      # Unraid). Bare-metal wings can omit this (defaults to KGWINGS_DATA).
+      KGWINGS_HOST_DATA: "${KGWINGS_HOST_DATA:-}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - wings-data:/data

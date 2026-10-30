@@ -19,7 +19,7 @@ func main() {
 		log.Fatalf("data dir: %v", err)
 	}
 	log.Printf("KG Wings %s listening on %s (data: %s)", version.Version, cfg.Listen, cfg.Data)
-	if err := http.ListenAndServe(cfg.Listen, api.Handler(cfg.Token, cfg.Data, cfg.UpdateURL)); err != nil {
+	if err := http.ListenAndServe(cfg.Listen, api.Handler(cfg.Token, cfg.Data, cfg.HostData, cfg.UpdateURL)); err != nil {
 		log.Printf("exiting: %v", err)
 		os.Exit(1)
 	}
