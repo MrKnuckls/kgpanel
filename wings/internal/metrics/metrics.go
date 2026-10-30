@@ -4,6 +4,7 @@ package metrics
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,8 +21,9 @@ type Sample struct {
 	MemLimitMB float64 `json:"mem_limit_mb"`
 	NetRXBps   float64 `json:"net_rx_bps"`
 	NetTXBps   float64 `json:"net_tx_bps"`
-	DiskBytes  uint64  `json:"disk_bytes"`
-	At         int64   `json:"at"` // unix seconds
+	DiskBytes      uint64 `json:"disk_bytes"`
+	DiskTotalBytes uint64 `json:"disk_total_bytes"`
+	At             int64  `json:"at"` // unix seconds
 }
 
 // Registry keeps a rolling buffer of samples per server.
@@ -94,13 +96,18 @@ func (r *Registry) sampleLoop(ctx context.Context, hostDataDir string) {
 				// disk: measure every 6th tick (~30s) — du is comparatively heavy
 				diskTick++
 				if diskTick%6 == 1 {
-					if db, err := dirBytes(ctx, filepath.Join(hostDataDir, "servers", id, "files")); err == nil {
+					filesPath := filepath.Join(hostDataDir, "servers", id, "files")
+					if db, err := dirBytes(ctx, filesPath); err == nil {
 						s.DiskBytes = db
+					}
+					if tot, err := fsTotal(ctx, filesPath); err == nil {
+						s.DiskTotalBytes = tot
 					}
 				} else {
 					// carry forward the last known disk size
 					if h := r.History(id); len(h) > 0 {
 						s.DiskBytes = h[len(h)-1].DiskBytes
+						s.DiskTotalBytes = h[len(h)-1].DiskTotalBytes
 					}
 				}
 				r.push(id, s)
@@ -162,6 +169,19 @@ func (r *Registry) push(id string, s Sample) {
 		buf = buf[len(buf)-r.max:]
 	}
 	r.bufs[id] = buf
+}
+
+// fsTotal returns the capacity in bytes of the filesystem containing path.
+func fsTotal(ctx context.Context, path string) (uint64, error) {
+	out, err := exec.CommandContext(ctx, "df", "-B1", "--output=size", path).Output()
+	if err != nil {
+		return 0, err
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) < 2 {
+		return 0, fmt.Errorf("df: unexpected output")
+	}
+	return strconv.ParseUint(strings.TrimSpace(lines[len(lines)-1]), 10, 64)
 }
 
 // dirBytes returns the total size in bytes under path (du-like).

@@ -96,7 +96,7 @@ async function loadMetrics() {
       $("mCpuNow").textContent = last.cpu_percent.toFixed(1) + "%";
       $("mMemNow").textContent = (last.mem_limit_mb ? last.mem_used_mb.toFixed(0) + " / " + last.mem_limit_mb.toFixed(0) + " MB" : last.mem_used_mb.toFixed(0) + " MB");
       $("mNetNow").textContent = fmtNet(last.net_rx_bps) + " ↓ / " + fmtNet(last.net_tx_bps) + " ↑";
-      $("mDiskNow").textContent = fmtBytes(last.disk_bytes);
+      $("mDiskNow").textContent = last.disk_total_bytes ? `${fmtBytes(last.disk_bytes)} / ${fmtBytes(last.disk_total_bytes)}` : fmtBytes(last.disk_bytes);
     }
   } catch (e) { /* wings may be starting; next tick retries */ }
 }
