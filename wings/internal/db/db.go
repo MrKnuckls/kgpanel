@@ -46,11 +46,25 @@ func docker(ctx context.Context, args ...string) (string, error) {
 }
 
 // rootPassword returns the node's shared MariaDB root password, generating and
-// persisting it on first use.
+// persisting it on first use. If the file is missing but a kggames-db container
+// already exists (e.g. wings redeployed with a fresh container FS), the
+// password is recovered from the container's env and re-persisted — generating
+// a new one would mismatch the running DB.
 func (m *Manager) rootPassword() (string, error) {
 	p := filepath.Join(m.hostDataDir, "db-root.txt")
 	if b, err := os.ReadFile(p); err == nil && len(b) > 8 {
 		return strings.TrimSpace(string(b)), nil
+	}
+	// recover from the existing container's env if present
+	if out, err := docker(context.Background(), "inspect", DBName, "--format", "{{range .Config.Env}}{{println .}}{{end}}"); err == nil {
+		for _, line := range strings.Split(out, "\n") {
+			if strings.HasPrefix(line, "MARIADB_ROOT_PASSWORD=") {
+				pw := strings.TrimPrefix(line, "MARIADB_ROOT_PASSWORD=")
+				_ = os.MkdirAll(m.hostDataDir, 0o755)
+				_ = os.WriteFile(p, []byte(pw+"\n"), 0o600)
+				return pw, nil
+			}
+		}
 	}
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {

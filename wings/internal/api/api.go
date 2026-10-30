@@ -54,7 +54,7 @@ func Handler(token, dataDir, hostDataDir, updateURL string, reg *metrics.Registr
 			env := in.Spec.Env
 			if in.Spec.DB {
 				var err error
-				env, err = provisionDB(ctx, hostDataDir, r.PathValue("id"), env)
+				env, err = provisionDB(ctx, dataDir, r.PathValue("id"), env)
 				if err != nil {
 					httpError(w, http.StatusBadGateway, err.Error())
 					return
@@ -93,7 +93,7 @@ func Handler(token, dataDir, hostDataDir, updateURL string, reg *metrics.Registr
 			env := sp.Env
 			if sp.DB {
 				var derr error
-				env, derr = provisionDB(ctx, hostDataDir, id, env)
+				env, derr = provisionDB(ctx, dataDir, id, env)
 				if derr != nil {
 					httpError(w, http.StatusBadGateway, derr.Error())
 					return
@@ -275,8 +275,11 @@ func Handler(token, dataDir, hostDataDir, updateURL string, reg *metrics.Registr
 // provisionDB ensures the node's shared MariaDB + a per-server database/user,
 // then merges the KG_DB_* env vars into the container env. Called whenever a
 // server with Spec.DB true is (re)created or started.
-func provisionDB(ctx context.Context, hostDataDir, serverID string, env map[string]string) (map[string]string, error) {
-	m := db.NewManager(hostDataDir)
+// dataDir is the wings-visible data dir (the mount inside the container); it is
+// used for file I/O (db-root.txt). HostDataDir is NOT used here — that path only
+// exists host-side for docker -v args, and this code runs inside the container.
+func provisionDB(ctx context.Context, dataDir, serverID string, env map[string]string) (map[string]string, error) {
+	m := db.NewManager(dataDir)
 	d, err := m.Provision(ctx, serverID)
 	if err != nil {
 		return nil, err
