@@ -147,7 +147,8 @@ func (s *Server) pushServerConfig(sv *store.Server, recreate bool) {
 // normalizePorts turns bare "8211/udp" entries into the explicit
 // "8211:8211/udp" host-map form docker expects. A bare "8211/udp" would make
 // docker publish a RANDOM host port (e.g. 32819), which breaks the fixed
-// connect address. Strings already containing ":" are left alone.
+// connect address. Strings already containing ":" are left alone, but a bare
+// "8211/udp" must become "8211:8211/udp" (port:port/proto) — NOT "8211/udp:8211/udp".
 func normalizePorts(in []string) []string {
 	out := make([]string, 0, len(in))
 	for _, p := range in {
@@ -155,11 +156,16 @@ func normalizePorts(in []string) []string {
 		if p == "" {
 			continue
 		}
-		if !strings.Contains(p, ":") {
-			out = append(out, p+":"+p)
-		} else {
+		if strings.Contains(p, ":") {
 			out = append(out, p)
+			continue
 		}
+		proto := ""
+		if i := strings.LastIndex(p, "/"); i >= 0 {
+			proto = p[i:]
+			p = p[:i]
+		}
+		out = append(out, p+":"+p+proto)
 	}
 	return out
 }
