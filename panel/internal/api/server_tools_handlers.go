@@ -74,7 +74,7 @@ func (s *Server) handleFilesUpload(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	s.st.Audit(userFromRequest(r), "file_upload", dir, hdr.Filename)
+	s.st.Audit(userFromRequest(r), "file_upload", r.PathValue("id"), dir+"/"+hdr.Filename)
 	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }
 
@@ -92,7 +92,7 @@ func (s *Server) handleFilesMkdir(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	s.st.Audit(userFromRequest(r), "file_mkdir", in.Path, "")
+	s.st.Audit(userFromRequest(r), "file_mkdir", r.PathValue("id"), in.Path)
 	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }
 
@@ -110,7 +110,7 @@ func (s *Server) handleFilesDelete(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	s.st.Audit(userFromRequest(r), "file_delete", in.Path, "")
+	s.st.Audit(userFromRequest(r), "file_delete", r.PathValue("id"), in.Path)
 	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }
 
@@ -194,7 +194,7 @@ func (s *Server) handleBackupsRestore(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	s.st.Audit(userFromRequest(r), "backup_restore", in.Name, r.PathValue("id"))
+	s.st.Audit(userFromRequest(r), "backup_restore", r.PathValue("id"), in.Name)
 	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }
 

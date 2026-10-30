@@ -112,7 +112,7 @@ func (s *Server) handleCreateServer(w http.ResponseWriter, r *http.Request) {
 	}
 	// push the container spec to wings so it can create the container on start
 	s.pushServerConfig(&in, false)
-	s.st.Audit(in.OwnerID, "server_create", in.Name, "")
+	s.st.Audit(in.OwnerID, "server_create", in.ID, in.Name)
 	writeJSON(w, http.StatusCreated, map[string]interface{}{"id": in.ID})
 }
 

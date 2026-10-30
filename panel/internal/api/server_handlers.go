@@ -46,7 +46,7 @@ func (s *Server) handlePower(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	s.st.Audit(userFromRequest(r), "power_"+in.Signal, sv.Name, serverID)
+	s.st.Audit(userFromRequest(r), "power_"+in.Signal, serverID, sv.Name)
 	writeJSON(w, http.StatusOK, map[string]string{"state": "sent"})
 }
 

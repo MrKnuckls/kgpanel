@@ -41,7 +41,8 @@ function showDash() { $("viewDash").style.display = "block"; $("viewDetail").sty
 function showDetail(id) {
   currentServer = id; $("viewDash").style.display = "none"; $("viewDetail").style.display = "block";
   document.querySelectorAll(".side-item").forEach((x) => x.classList.toggle("active", x.dataset.id === id));
-  $("dName").textContent = id; refreshStatus(); connectConsole(); loadFiles(); loadSchedules(); loadBackups(); loadInfo();
+  $("dName").textContent = id; refreshStatus(); connectConsole(); loadFiles(); loadSchedules(); loadBackups(); loadDatabases();
+  loadNetwork(); loadStartup(); loadUsers(); loadActivity();
   startMetrics();
 }
 $("backBtn").addEventListener("click", showDash);
@@ -188,7 +189,11 @@ document.querySelectorAll(".dtab").forEach((b) => b.addEventListener("click", ()
   if (b.dataset.tab === "schedules") loadSchedules();
   if (b.dataset.tab === "backups") loadBackups();
   if (b.dataset.tab === "settings") loadSettings();
-  if (b.dataset.tab === "info") loadInfo();
+  if (b.dataset.tab === "databases") loadDatabases();
+  if (b.dataset.tab === "users") loadUsers();
+  if (b.dataset.tab === "network") loadNetwork();
+  if (b.dataset.tab === "startup") loadStartup();
+  if (b.dataset.tab === "activity") loadActivity();
 }));
 
 /* ---------- console ---------- */
@@ -324,17 +329,120 @@ $("bCreate").addEventListener("click", async () => {
   try { await jfetch("/servers/" + currentServer + "/backups/create", { method: "POST" }); $("bHint").textContent = "backup created (may take a moment)"; loadBackups(); } catch (e) { $("bHint").textContent = "failed: " + e.message; }
 });
 
-/* ---------- info ---------- */
-async function loadInfo() {
+/* ---------- databases ---------- */
+async function loadDatabases() {
+  const empty = $("dbEmpty");
+  try {
+    const [svd, eggd] = await Promise.all([jfetch("/servers"), jfetch("/eggs")]);
+    const sv = svd.servers.find((x) => x.id === currentServer);
+    const egg = sv && eggd.eggs.find((e) => e.id === sv.egg_id);
+    empty.style.display = "block";
+    if (egg && egg.db) {
+      const net = egg.network || "kggames-net";
+      empty.innerHTML = `<p style="font-size:13px">this egg uses a shared MariaDB on <b>${esc(net)}</b>.</p>
+        <p class="muted" style="font-size:12px;margin-top:8px">a per-server database is created automatically on the first start. your game connects with the <code>KG_DB_*</code> env vars (host <code>db</code>, port 3306, per-server DB + user + password).</p>`;
+    } else {
+      empty.innerHTML = `<p style="font-size:13px">this egg needs no database.</p>
+        <p class="muted" style="font-size:12px;margin-top:8px">toggle <b>needs a database</b> on its egg in <b>startup</b> or <b>settings</b> to get a shared MariaDB database on the node.</p>`;
+    }
+  } catch (e) { empty.style.display = "block"; empty.textContent = e.message; }
+}
+
+/* ---------- users (subusers) ---------- */
+async function loadUsers() {
+  const body = $("userTable").querySelector("tbody");
+  try {
+    const d = await jfetch("/servers/" + currentServer + "/users");
+    const rows = (d.users || []);
+    $("uPass").value = "";
+    body.innerHTML = rows.length ? rows.map((u) => `
+      <tr>
+        <td>${esc(u.username)}</td>
+        <td><span class="badge">${esc(u.permission)}</span></td>
+        <td style="text-align:right"><button class="fdel" data-del="${esc(u.id)}">✕</button></td>
+      </tr>`).join("") : `<tr><td class="muted" colspan="3">no subusers yet — add one above. the server owner always has full access.</td></tr>`;
+    body.querySelectorAll("[data-del]").forEach((e) => e.addEventListener("click", async () => {
+      if (!confirm("remove this user?")) return;
+      try { await jfetch("/servers/" + currentServer + "/users/" + e.dataset.del + "/delete", { method: "POST" }); loadUsers(); } catch (err) { alert(err.message); }
+    }));
+  } catch (e) { body.innerHTML = `<tr><td class="muted">${esc(e.message)}</td></tr>`; }
+}
+$("uAdd").addEventListener("click", async () => {
+  const name = $("uName").value.trim(), perm = $("uPerm").value;
+  if (!name) { alert("enter a username"); return; }
+  try { await jfetch("/servers/" + currentServer + "/users/create", { method: "POST", body: JSON.stringify({ username: name, permission: perm }) }); $("uName").value = ""; loadUsers(); } catch (e) { alert(e.message); }
+});
+
+/* ---------- network (allocations) ---------- */
+async function loadNetwork() {
   try {
     const dd = await jfetch("/servers");
     const sv = dd.servers.find((x) => x.id === currentServer);
     if (!sv) return;
-    $("dInfo").innerHTML = [
-      ["id", sv.id], ["egg", sv.egg_name], ["node", sv.node_name],
-      ["memory", sv.memory_mb + " MB"], ["cpu", sv.cpu_percent + "%"], ["ports", (sv.ports || []).join(", ")],
+    const allocs = (sv.ports || []).map((p) => {
+      const m = p.match(/^(?:([^:]+):)?(\d+)\/(udp|tcp)?$/);
+      if (!m) return [p, "—"];
+      return [`${m[1] || m[2]}:${m[2]}/${m[3] || "tcp"}`, `container port ${m[2]} (${m[3] || "tcp"})`];
+    });
+    $("netInfo").innerHTML = [
+      ["node", sv.node_name], ["node url", sv.node_url],
+      ...allocs.map(([a, note]) => [a, note]),
     ].map(([k, v]) => `<div class="info-item"><div class="k">${k}</div><div class="v">${esc(v || "—")}</div></div>`).join("");
-  } catch (e) {}
+  } catch (e) { $("netInfo").textContent = e.message; }
+}
+
+/* ---------- startup ---------- */
+let startupEggId = null, startupEgg = null;
+async function loadStartup() {
+  try {
+    const [svd, eggd] = await Promise.all([jfetch("/servers"), jfetch("/eggs")]);
+    const sv = svd.servers.find((x) => x.id === currentServer);
+    const egg = sv && eggd.eggs.find((e) => e.id === sv.egg_id);
+    if (!egg) return;
+    startupEggId = egg.id; startupEgg = egg;
+    $("stImage").value = egg.image || "";
+    $("stStartup").value = egg.startup || "";
+    $("stStop").value = egg.stop_command || "";
+    $("stVars").value = (egg.variables || []).join(",");
+    $("stMsg").textContent = "";
+  } catch (e) { $("stMsg").textContent = e.message; }
+}
+$("stSave").addEventListener("click", async () => {
+  try {
+    if (!startupEgg) return loadStartup();
+    $("stMsg").textContent = "saving…";
+    await jfetch("/eggs/update", {
+      method: "POST",
+      body: JSON.stringify({
+        id: startupEggId,
+        name: startupEgg.name || "",
+        description: startupEgg.description || "",
+        image: $("stImage").value.trim(),
+        startup: $("stStartup").value.trim(),
+        stop_command: $("stStop").value.trim(),
+        variables: $("stVars").value.split(",").map((s) => s.trim()).filter(Boolean),
+        ports: startupEgg.ports || [],
+        network: startupEgg.network || "",
+        db: !!startupEgg.db,
+      }),
+    });
+    $("stMsg").textContent = "saved — applies on next start.";
+  } catch (e) { $("stMsg").textContent = "failed: " + e.message; }
+});
+
+/* ---------- activity ---------- */
+async function loadActivity() {
+  const body = $("activityTable").querySelector("tbody");
+  try {
+    const d = await jfetch("/servers/" + currentServer + "/activity?limit=50");
+    body.innerHTML = (d.activity || []).length ? d.activity.map((a) => `
+      <tr>
+        <td class="mono muted">${new Date(a.time).toLocaleString()}</td>
+        <td>${esc(a.actor)}</td>
+        <td>${esc(a.action)}</td>
+        <td class="mono">${esc(a.detail || "")}</td>
+      </tr>`).join("") : `<tr><td class="muted" colspan="4">no activity yet.</td></tr>`;
+  } catch (e) { body.innerHTML = `<tr><td class="muted">${esc(e.message)}</td></tr>`; }
 }
 
 /* ---------- settings (server + egg) ---------- */

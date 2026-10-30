@@ -47,6 +47,13 @@ type Egg struct {
 	DB bool `json:"db,omitempty"`
 }
 
+type SubUser struct {
+	ID         string    `json:"id"`
+	Username   string    `json:"username"`
+	Permission string    `json:"permission"` // view | control | admin
+	CreatedAt  time.Time `json:"created_at"`
+}
+
 type Server struct {
 	ID          string            `json:"id"`
 	Name        string            `json:"name"`
@@ -57,6 +64,7 @@ type Server struct {
 	CPUPercent  int               `json:"cpu_percent"`
 	Ports       []string          `json:"ports"`
 	Env         map[string]string `json:"env"`
+	SubUsers    []SubUser         `json:"sub_users,omitempty"`
 	ContainerID string            `json:"container_id,omitempty"`
 	CreatedAt   time.Time         `json:"created_at"`
 }
@@ -286,6 +294,62 @@ func (s *Store) UpdateServer(id string, fn func(*Server)) error {
 	}
 	fn(sv)
 	return s.save("servers.json", s.servers)
+}
+
+// AddSubUser appends a server-scoped subuser (panel accounts residing on the
+// server record; permission gates what they may do in the UI).
+func (s *Store) AddSubUser(serverID string, su *SubUser) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sv, ok := s.servers[serverID]
+	if !ok {
+		return fmt.Errorf("server %s not found", serverID)
+	}
+	for _, x := range sv.SubUsers {
+		if x.Username == su.Username {
+			return fmt.Errorf("user %s already exists", su.Username)
+		}
+	}
+	su.ID = newID()
+	su.CreatedAt = time.Now()
+	sv.SubUsers = append(sv.SubUsers, *su)
+	return s.save("servers.json", s.servers)
+}
+
+// RemoveSubUser deletes a subuser by id from the server record.
+func (s *Store) RemoveSubUser(serverID, subID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sv, ok := s.servers[serverID]
+	if !ok {
+		return fmt.Errorf("server %s not found", serverID)
+	}
+	for i, x := range sv.SubUsers {
+		if x.ID == subID {
+			sv.SubUsers = append(sv.SubUsers[:i], sv.SubUsers[i+1:]...)
+			return s.save("servers.json", s.servers)
+		}
+	}
+	return fmt.Errorf("no such user")
+}
+
+// AuditForServer returns the most recent audit entries targeting this server.
+func (s *Store) AuditForServer(serverID string, n int) []AuditEntry {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]AuditEntry, 0, n)
+	for i := len(s.audit) - 1; i >= 0 && len(out) < n; i-- {
+		// server actions record the id in Target (backups) or Detail (power) —
+		// match either so Activity is reliable regardless of convention.
+		if s.audit[i].Target == serverID || s.audit[i].Detail == serverID {
+			out = append(out, s.audit[i])
+		}
+	}
+	// newest first
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return out
 }
 
 func (s *Store) SetServerContainer(id, containerID string) error {
