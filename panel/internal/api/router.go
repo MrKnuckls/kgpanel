@@ -9,6 +9,7 @@ import (
 	nhooyr "golang.org/x/net/websocket"
 
 	"kgpanel/panel/internal/auth"
+	"kgpanel/panel/internal/web"
 	"kgpanel/panel/internal/wingsclient"
 )
 
@@ -55,8 +56,42 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	// websocket console proxy: browser -> panel -> wings
 	mux.Handle("/api/console/{id}", s.auth(nhooyr.Handler(s.handleConsoleProxy)))
 
-	mux.Handle("/", ui)
+	// UI: gate the root — show the login/setup page until authenticated, then
+	// the dashboard. The embedded FileServer (ui) serves everything else.
+	mux.Handle("/", s.gateUI(ui))
 	return logRequests(mux)
+}
+
+// gateUI wraps the static file server so / and /index.html only render the
+// dashboard for authenticated users; everyone else gets login.html (which is
+// also the first-run setup wizard). Other static assets (/css, /js, /img,
+// /login.html) pass straight through so the login page can load.
+func (s *Server) gateUI(ui http.Handler) http.Handler {
+	index := web.Page("index.html")
+	login := web.Page("login.html")
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/", "/index", "/index.html":
+			page := login
+			if s.authenticated(r) {
+				page = index
+			}
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = w.Write(page)
+			return
+		default:
+			ui.ServeHTTP(w, r)
+		}
+	})
+}
+
+func (s *Server) authenticated(r *http.Request) bool {
+	tok := auth.Bearer(r)
+	if tok == "" {
+		tok = r.URL.Query().Get("token")
+	}
+	_, err := auth.Verify(s.secret, tok)
+	return err == nil
 }
 
 // auth middleware verifies the bearer token and stamps the user id header
