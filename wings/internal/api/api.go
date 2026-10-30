@@ -12,6 +12,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	"kgpanel/wings/internal/docker"
+	"kgpanel/wings/internal/srvconfig"
 	"kgpanel/wings/internal/update"
 	"kgpanel/wings/internal/version"
 )
@@ -20,6 +21,28 @@ import (
 // must equal the configured shared secret (subtle.ConstantTimeCompare-style).
 func Handler(token, dataDir, updateURL string) http.Handler {
 	mux := http.NewServeMux()
+
+	// config: POST /v1/servers/{id}/config {image,startup,stop_command,env,ports,memory_mb,cpu_percent}
+	// stores the container spec wings needs to (re)create the container.
+	mux.HandleFunc("/v1/servers/{id}/config", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			httpError(w, http.StatusMethodNotAllowed, "POST only")
+			return
+		}
+		if !checkAuth(w, r, token) {
+			return
+		}
+		var in srvconfig.Spec
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			httpError(w, http.StatusBadRequest, "bad json")
+			return
+		}
+		if err := srvconfig.Save(dataDir, r.PathValue("id"), in); err != nil {
+			httpError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
+	})
 
 	// power: POST /v1/servers/{id}/power {signal}
 	mux.HandleFunc("/v1/servers/{id}/power", func(w http.ResponseWriter, r *http.Request) {
@@ -36,6 +59,18 @@ func Handler(token, dataDir, updateURL string) http.Handler {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 		defer cancel()
+		if in.Signal == "start" {
+			// ensure the container exists first (create on first boot / after reboot)
+			sp, err := srvconfig.Load(dataDir, id)
+			if err != nil {
+				httpError(w, http.StatusBadRequest, "server config missing: "+err.Error())
+				return
+			}
+			if _, err := docker.EnsureExists(ctx, id, sp.Image, sp.Env, sp.Ports, sp.MemoryMB, sp.CPUPercent, sp.Startup); err != nil {
+				httpError(w, http.StatusBadGateway, err.Error())
+				return
+			}
+		}
 		if err := docker.Power(ctx, id, in.Signal, 30); err != nil {
 			httpError(w, http.StatusBadGateway, err.Error())
 			return

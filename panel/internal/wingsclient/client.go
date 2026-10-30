@@ -24,6 +24,28 @@ func New() *Client {
 
 func urlQuery(s string) string { return url.QueryEscape(s) }
 
+// ServerConfig pushes the container spec to wings so it can (re)create the
+// container on start. Returns an error if wings rejects the spec.
+type ServerSpec struct {
+	Image      string            `json:"image"`
+	Startup    string            `json:"startup"`
+	StopCmd    string            `json:"stop_command"`
+	Env        map[string]string `json:"env"`
+	Ports      []string          `json:"ports"`
+	MemoryMB   int               `json:"memory_mb"`
+	CPUPercent int               `json:"cpu_percent"`
+}
+
+func (c *Client) ServerConfig(n *store.Node, serverID string, sp ServerSpec) error {
+	body, _ := json.Marshal(sp)
+	resp, err := c.do(n, http.MethodPost, "/v1/servers/"+serverID+"/config", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
+}
+
 // Power tells a node's wings to start/stop/restart/kill a server container.
 func (c *Client) Power(n *store.Node, serverID, signal string) error {
 	body, _ := json.Marshal(map[string]string{"signal": signal})

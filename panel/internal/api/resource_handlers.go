@@ -2,10 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
 	"kgpanel/panel/internal/store"
+	"kgpanel/panel/internal/wingsclient"
 )
 
 // handleNodes lists nodes. The wings token is masked on the wire.
@@ -105,6 +107,34 @@ func (s *Server) handleCreateServer(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "store failed")
 		return
 	}
+	// push the container spec to wings so it can create the container on start
+	s.pushServerConfig(&in)
 	s.st.Audit(in.OwnerID, "server_create", in.Name, "")
 	writeJSON(w, http.StatusCreated, map[string]interface{}{"id": in.ID})
+}
+
+// pushServerConfig resolves the server's egg + node and pushes the container
+// spec to wings. Failures are logged, not fatal — a wings that's briefly down
+// must not block server creation (the spec is re-pushed on start as a fallback).
+func (s *Server) pushServerConfig(sv *store.Server) {
+	egg := s.st.GetEgg(sv.EggID)
+	if egg == nil {
+		return
+	}
+	n := s.st.GetNode(sv.NodeID)
+	if n == nil {
+		return
+	}
+	sp := wingsclient.ServerSpec{
+		Image:      egg.Image,
+		Startup:    egg.Startup,
+		StopCmd:    egg.StopCommand,
+		Env:        sv.Env,
+		Ports:      sv.Ports,
+		MemoryMB:   sv.MemoryMB,
+		CPUPercent: sv.CPUPercent,
+	}
+	if err := s.wings.ServerConfig(n, sv.ID, sp); err != nil {
+		log.Printf("pushServerConfig %s: %v", sv.Name, err)
+	}
 }

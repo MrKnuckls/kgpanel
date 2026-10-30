@@ -1,10 +1,11 @@
 # ---- build stage ----
 FROM golang:1.24-alpine AS build
+ARG VERSION=dev
 WORKDIR /src
 COPY panel/go.mod panel/go.sum* ./
 RUN go mod download || true
 COPY panel/ ./
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/kgpanel ./cmd/kgpanel
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X kgpanel/panel/internal/version.Version=${VERSION}" -o /out/kgpanel ./cmd/kgpanel
 
 # ---- runtime ----
 FROM alpine:3.20
