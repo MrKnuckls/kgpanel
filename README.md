@@ -27,9 +27,30 @@ from source (`make build`).
 
 Covers: requirements → download → panel install (binary + systemd, or Docker
 Compose) → first-run admin setup → wings install (Linux + Windows) → adding
-eggs → deploying a first server → securing, backups, troubleshooting.
+eggs → deploying a first server → **domain + free SSL via Cloudflare (one-command
+scripts for Linux/macOS/WSL *and* native Windows)** → securing, backups,
+troubleshooting.
 
 No database, no PHP, no Redis — just one binary and a JSON data directory.
+
+## Domain + SSL in one command
+
+Point a domain at your panel without touching your router, certs, or firewall:
+
+```bash
+# Linux / macOS / WSL
+bash <(curl -fsSL https://raw.githubusercontent.com/MrKnuckls/kgpanel/main/deploy/kgpanel-cloudflare.sh) \
+  --domain panel.example.com --cf-token "$CF_TOKEN" --cf-account YOUR_ACCOUNT_ID
+```
+
+```powershell
+# Windows — no WSL needed
+powershell -ExecutionPolicy Bypass -File deploy\kgpanel-cloudflare.ps1 `
+  -Domain panel.example.com -CfToken $env:CF_TOKEN -CfAccount YOUR_ACCOUNT_ID
+```
+
+Creates the Cloudflare Tunnel, DNS record (proxied), ingress, optional
+email-gate, and a boot-start cloudflared service — SSL served automatically.
 
 ## Screenshots
 

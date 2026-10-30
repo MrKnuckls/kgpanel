@@ -295,18 +295,129 @@ all your deployed panels/wings pick it up on their next check.
 
 ---
 
-## 11. Securing it (recommended)
+## 11. Add a domain name + free SSL (works on any OS)
 
-- Put the panel behind a reverse proxy with TLS (Caddy/Nginx) or Cloudflare
-  Tunnel, and add access control.
-- Run wings on a host that is **only reachable from your panel + your game
-  hosts** (separate VLAN if your router supports it — game servers are a
-  common attack surface).
-- Rotate `KGPANEL_SECRET` and wing tokens by re-creating the node entry.
+Your panel works fine on `http://<ip>:8080`, but for a public panel you want a
+domain with HTTPS. KGPanel does this through **Cloudflare** — a tunnel from
+your panel to Cloudflare's edge, which **serves SSL automatically** (valid
+cert, auto-renewed, nothing to buy or install). DNS, tunnel, ingress, and SSL
+are all API-driven, so the whole thing is scriptable and identical on every OS.
+
+> Why a tunnel instead of opening ports? No port forwards, no firewall holes
+> on your router, no public exposure of your panel's real IP, and SSL is free
+> and automatic. Games themselves still publish their own ports (8211/udp etc)
+> — the tunnel fronts the *panel*, not the game traffic.
+
+Also note: the tunnel only exposes the **panel** (`:8080`). Wings (`:8081`)
+finds the panel over your LAN/private network and is never reachable from the
+internet — game ports stay local too (or forwarded deliberately).
+
+### Option A — one command (recommended)
+
+You need a domain whose DNS is already on Cloudflare, plus three values:
+
+| Value | Where to get it | Example |
+|---|---|---|
+| API token | Cloudflare dashboard → My Profile → API Tokens (zone edit permission) | `cfat_...` |
+| Account ID | dashboard → right sidebar (scroll down) | 32-hex |
+| Your domain | a zone in that account | `panel.example.com` |
+
+Then run the matching script for your OS — nothing else to install:
+
+**Linux / macOS / WSL** (bash):
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/MrKnuckls/kgpanel/main/deploy/kgpanel-cloudflare.sh) \
+  --domain panel.example.com \
+  --cf-token "$CLOUDFLARE_API_TOKEN" \
+  --cf-account YOUR_ACCOUNT_ID
+```
+
+**Windows** (native PowerShell — no WSL, no bash needed):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File kgpanel-cloudflare.ps1 `
+  -Domain panel.example.com -CfToken $env:CF_TOKEN -CfAccount YOUR_ACCOUNT_ID
+```
+
+Optional flags (both scripts):
+
+| Flag (bash / PowerShell) | Meaning |
+|---|---|
+| `--backend` / `-Backend` | where the panel actually is (default `http://localhost:8080`; use the panel's host:port when panel and tunnel aren't on the same box) |
+| `--access` / `-Access` | gate the panel behind a Cloudflare email login — repeat for several emails |
+| `--dry-run` / `-DryRun` | check credentials + zone + tunnel without changing anything |
+| `--tunnel` / `-Tunnel` | name of the tunnel to use/create (default `kgpanel`) |
+
+What it does, step by step:
+
+1. verifies your API token
+2. finds your Cloudflare zone from the domain
+3. creates a Cloudflare Tunnel (or reuses one with the same name)
+4. adds the DNS record — `panel.example.com` → tunnel, **proxied** (orange cloud)
+5. programmes the tunnel ingress: `panel.example.com → your backend` (404 catch-all last)
+6. (`--access`) adds a Cloudflare Access app so only your email(s) can open the panel
+7. installs and runs cloudflared — as a Docker container, or a boot-started
+   service (systemd on Linux, Scheduled Task on Windows)
+8. verifies `https://panel.example.com` answers
+
+From then on, open `https://panel.example.com` — padlock and all.
+
+### Option B — manual (dashboard, any OS, no scripts)
+
+If you'd rather click than script:
+
+1. **Cloudflare dashboard → Zero Trust → Networks → Tunnels → Create a
+   tunnel** (cloudflared type) — name it and copy the token it shows.
+2. In the tunnel's **Public Hostname** tab, add `panel.example.com` → service
+   `HTTP` → `localhost:8080` (or your panel's host:port).
+3. Run the cloudflared install one-liner the wizard shows for your OS (Linux,
+   macOS, Windows — even Windows Service mode). It connects the tunnel
+   outbound, so **no router config is needed**.
+4. DNS is automatic for in-dashboard tunnels (the CNAME is added for you).
+   Make sure it shows **Proxy status: Proxied** — that's the SSL part.
+5. (Optional lock-down) Zero Trust → Access → Applications → Add an app →
+   pick your panel domain → add a policy like *Allow: specific email* → save.
+   Everyone else gets a Cloudflare login challenge before the panel loads.
+
+**That's the whole SSL story**: since the tunnel runs behind Cloudflare's
+proxy, Cloudflare terminates TLS and issues/renews the certificate itself.
+You never touch certs, ports, or the router for the panel's HTTPS.
+
+### Verify
+
+```bash
+curl -sI https://panel.example.com | head -3
+```
+Expect `HTTP/2 200` (or `302/307` → the panel's login redirect — still fine).
+If the Access gate is on you'll see `401`/`403` from Cloudflare — expected.
+
+### Decommissioning
+
+```bash
+# bash — removes the tunnel + DNS record (keeps cloudflared installed)
+bash deploy/kgpanel-cloudflare.sh --domain panel.example.com \
+  --cf-token "$TOKEN" --cf-account "$ACCT" --uninstall
+```
+Or in the dashboard: Zero Trust → Tunnels → your tunnel → … → Delete, and
+delete the DNS record on the domain's DNS page.
 
 ---
 
-## 12. Backups & lifecycle
+## 12. Securing it (beyond the tunnel)
+
+- The Cloudflare tunnel (section 11) already fixes the big one: the panel is
+  only reachable through Cloudflare, over HTTPS, with no port forwards and no
+  public IP exposure.
+- Run wings on a host that is **only reachable from your panel** (a private
+  network / VLAN). Game servers are a common attack surface — keep them
+  isolated from everything else.
+- Rotate `KGPANEL_SECRET` and wing tokens by re-creating the node entry if a
+  machine is ever compromised.
+
+---
+
+## 13. Backups & lifecycle
 
 The panel's state lives entirely in the files under `--data`:
 
@@ -317,7 +428,7 @@ copy — writes are atomic rename-replace). Restore = same directory back.
 
 ---
 
-## 13. Troubleshooting
+## 14. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
@@ -331,7 +442,7 @@ copy — writes are atomic rename-replace). Restore = same directory back.
 
 ---
 
-## 14. Windows .exe notes
+## 15. Windows .exe notes
 
 The Windows binaries are real native executables — no WSL, no emulation. Both
 panel and wings run as console processes under Windows.
