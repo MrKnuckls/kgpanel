@@ -1,5 +1,11 @@
 const API = "/api";
 let token = localStorage.getItem("kg_token") || "";
+// fall back to the auth cookie if localStorage has none (covers sessions
+// established purely via cookie, e.g. after check() sync on the login page).
+if (!token) {
+  const m = document.cookie.match(/(?:^|; )kg_token=([^;]+)/);
+  if (m) token = decodeURIComponent(m[1]);
+}
 let currentServer = null;
 let ws = null;
 let cron = null;

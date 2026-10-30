@@ -65,8 +65,14 @@ async function check() {
   if (!state) return;
   try {
     const r = await fetch(API + "/me", { headers: { Authorization: "Bearer " + state } });
-    if (r.ok) { location.href = "/"; return; }
-    localStorage.removeItem("kg_token"); state = null;
+    if (r.ok) {
+      // carry the already-valid stored token into a cookie so the gate on /
+      // lets us in — otherwise / serves the login page again and loop.
+      document.cookie = "kg_token=" + encodeURIComponent(state) + "; path=/";
+      location.href = "/";
+      return;
+    }
+    localStorage.removeItem("kg_token"); document.cookie = "kg_token=; path=/; Max-Age=0"; state = null;
   } catch (e) {}
 }
 check();
