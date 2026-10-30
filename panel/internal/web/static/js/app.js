@@ -346,7 +346,9 @@ async function loadSettings() {
     if (!sv) return;
     $("setMem").value = sv.memory_mb;
     $("setCpu").value = sv.cpu_percent;
-    $("setPorts").value = (sv.ports || []).join(",");
+    // display just the container port (8211:8211/udp -> 8211/udp) so the field
+    // reads cleanly; save normalizes it back to the explicit map form.
+    $("setPorts").value = (sv.ports || []).map((p) => p.replace(/^.*?:/, "")).join(",");
     const egg = eggd.eggs.find((e) => e.id === sv.egg_id);
     if (egg) {
       currentEggId = egg.id;
@@ -354,7 +356,7 @@ async function loadSettings() {
       $("setEggImage").value = egg.image;
       $("setEggStartup").value = egg.startup;
       $("setEggStop").value = egg.stop_command || "";
-      $("setEggPorts").value = (egg.ports || []).join(",");
+      $("setEggPorts").value = (egg.ports || []).map((p) => p.replace(/^.*?:/, "")).join(",");
       $("setEggVars").value = (egg.variables || []).join(",");
     }
     $("setMsg").textContent = "";
