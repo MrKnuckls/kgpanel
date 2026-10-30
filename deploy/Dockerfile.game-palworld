@@ -1,0 +1,30 @@
+# KGPanel clean-room game base image: PalWorld dedicated server.
+# steamcmd installed manually (not the Pterodactyl-yolks build) so the
+# wings startup wrapper (sh -c + signal trap) controls the process tree.
+ARG BASE=ubuntu:22.04
+FROM ${BASE}
+
+ARG VERSION=0.1.0
+LABEL org.kgpanel.image="kgpalworld" org.kgpanel.version="${VERSION}"
+
+# PalWorld dedicated server linux needs: curl (steamcmd download), 32-bit libs
+# (steamcmd + server), libatomic (server), libunwind (crash dumps).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl lib32gcc-s1 lib32stdc++6 libcurl4 \
+        libatomic1 libunwind8 \
+    && rm -rf /var/lib/apt/lists/*
+
+# steamcmd from Valve's official CDN; steamcmd.sh sets LD_LIBRARY_PATH for libs/
+RUN curl -sSL -o /tmp/steamcmd.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz \
+    && mkdir -p /opt/steamcmd \
+    && tar -xzf /tmp/steamcmd.tar.gz -C /opt/steamcmd \
+    && chmod +x /opt/steamcmd/steamcmd.sh \
+    && rm /tmp/steamcmd.tar.gz
+
+ENV PATH="/opt/steamcmd:${PATH}"
+
+# PalWorld's UE server binary refuses to run as root; run it as an unprivileged
+# user. The wings startup drops privileges via setpriv (see egg startup).
+RUN useradd -m -u 1000 steam
+
+WORKDIR /server

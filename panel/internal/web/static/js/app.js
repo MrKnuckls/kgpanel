@@ -37,13 +37,69 @@ function fmtSize(b) {
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
 /* ---------- views ---------- */
-function showDash() { $("viewDash").style.display = "block"; $("viewDetail").style.display = "none"; currentServer = null; if (ws) { try { ws.close(); } catch (e) {} ws = null; } refresh(); }
+function showDash() { $("viewDash").style.display = "block"; $("viewDetail").style.display = "none"; currentServer = null; stopMetrics(); if (ws) { try { ws.close(); } catch (e) {} ws = null; } refresh(); }
 function showDetail(id) {
   currentServer = id; $("viewDash").style.display = "none"; $("viewDetail").style.display = "block";
   document.querySelectorAll(".side-item").forEach((x) => x.classList.toggle("active", x.dataset.id === id));
   $("dName").textContent = id; refreshStatus(); connectConsole(); loadFiles(); loadSchedules(); loadBackups(); loadInfo();
+  startMetrics();
 }
 $("backBtn").addEventListener("click", showDash);
+
+/* ---------- metrics (live resource sparklines) ---------- */
+let metricsTimer = null;
+function startMetrics() {
+  if (metricsTimer) clearInterval(metricsTimer);
+  loadMetrics();
+  metricsTimer = setInterval(loadMetrics, 5000);
+}
+function stopMetrics() { if (metricsTimer) { clearInterval(metricsTimer); metricsTimer = null; } }
+function sparkLine(svg, values, max) {
+  const w = 120, h = 36, pad = 2;
+  if (!values || values.length < 2) { svg.innerHTML = ""; return; }
+  max = max || Math.max(...values, 1);
+  const pts = values.map((v, i) => {
+    const x = pad + (i * (w - 2 * pad)) / (values.length - 1);
+    const y = h - pad - (v / max) * (h - 2 * pad);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  svg.innerHTML = `<polyline points="${pts}"/>`;
+}
+function fmtNet(bps) {
+  if (!bps || isNaN(bps) || bps < 0) return "—";
+  if (bps >= 1048576) return (bps / 1048576).toFixed(1) + " MB/s";
+  if (bps >= 1024) return (bps / 1024).toFixed(1) + " KB/s";
+  return Math.round(bps) + " B/s";
+}
+function fmtBytes(b) {
+  if (!b) return "—";
+  if (b >= 1099511627776) return (b / 1099511627776).toFixed(1) + " TB";
+  if (b >= 1073741824) return (b / 1073741824).toFixed(1) + " GB";
+  if (b >= 1048576) return (b / 1048576).toFixed(1) + " MB";
+  return (b / 1024).toFixed(0) + " KB";
+}
+async function loadMetrics() {
+  if (!currentServer) return;
+  try {
+    const d = await jfetch("/servers/" + currentServer + "/metrics");
+    const s = d.samples || [];
+    const cpu = s.map((x) => x.cpu_percent || 0);
+    const mem = s.map((x) => (x.mem_limit_mb ? (x.mem_used_mb / x.mem_limit_mb) * 100 : 0));
+    const net = s.map((x) => (x.net_rx_bps || 0) + (x.net_tx_bps || 0));
+    const disk = s.map((x) => x.disk_bytes || 0);
+    sparkLine($("mCpuSvg"), cpu, 100);
+    sparkLine($("mMemSvg"), mem, 100);
+    sparkLine($("mNetSvg"), net);
+    sparkLine($("mDiskSvg"), disk);
+    const last = s[s.length - 1];
+    if (last) {
+      $("mCpuNow").textContent = last.cpu_percent.toFixed(1) + "%";
+      $("mMemNow").textContent = (last.mem_limit_mb ? last.mem_used_mb.toFixed(0) + " / " + last.mem_limit_mb.toFixed(0) + " MB" : last.mem_used_mb.toFixed(0) + " MB");
+      $("mNetNow").textContent = fmtNet(last.net_rx_bps) + " ↓ / " + fmtNet(last.net_tx_bps) + " ↑";
+      $("mDiskNow").textContent = fmtBytes(last.disk_bytes);
+    }
+  } catch (e) { /* wings may be starting; next tick retries */ }
+}
 
 /* ---------- topbar (whoami) ---------- */
 async function refresh() {

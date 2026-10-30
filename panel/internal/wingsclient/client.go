@@ -193,6 +193,33 @@ func (c *Client) BackupsList(n *store.Node, serverID string) ([]map[string]inter
 	return out.Backups, nil
 }
 
+// Sample mirrors wings' metrics.Sample (CPU/mem/net/disk at a point in time).
+type Sample struct {
+	CPUPercent float64 `json:"cpu_percent"`
+	MemUsedMB  float64 `json:"mem_used_mb"`
+	MemLimitMB float64 `json:"mem_limit_mb"`
+	NetRXBps   float64 `json:"net_rx_bps"`
+	NetTXBps   float64 `json:"net_tx_bps"`
+	DiskBytes  uint64  `json:"disk_bytes"`
+	At         int64   `json:"at"`
+}
+
+// Metrics returns the rolling resource history wings keeps for a server.
+func (c *Client) Metrics(n *store.Node, serverID string) ([]Sample, error) {
+	resp, err := c.do(n, http.MethodGet, "/v1/servers/"+serverID+"/metrics", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var out struct {
+		Samples []Sample `json:"samples"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+	return out.Samples, nil
+}
+
 // BackupCreate triggers a backup on wings.
 func (c *Client) BackupCreate(n *store.Node, serverID string) error {
 	resp, err := c.do(n, http.MethodPost, "/v1/servers/"+serverID+"/backups/create", bytes.NewReader([]byte("{}")))

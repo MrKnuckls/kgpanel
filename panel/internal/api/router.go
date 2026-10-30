@@ -36,6 +36,7 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.Handle("/api/servers/create", s.auth(http.HandlerFunc(s.handleCreateServer)))
 	mux.Handle("/api/servers/{id}/power", s.auth(http.HandlerFunc(s.handlePower)))
 	mux.Handle("/api/servers/{id}/status", s.auth(http.HandlerFunc(s.handleStatus)))
+	mux.Handle("/api/servers/{id}/metrics", s.auth(http.HandlerFunc(s.handleMetrics)))
 	mux.Handle("/api/servers/{id}/files", s.auth(http.HandlerFunc(s.handleFilesList)))
 	mux.Handle("/api/servers/{id}/files/upload", s.auth(http.HandlerFunc(s.handleFilesUpload)))
 	mux.Handle("/api/servers/{id}/files/mkdir", s.auth(http.HandlerFunc(s.handleFilesMkdir)))

@@ -12,6 +12,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	"kgpanel/wings/internal/docker"
+	"kgpanel/wings/internal/metrics"
 	"kgpanel/wings/internal/srvconfig"
 	"kgpanel/wings/internal/update"
 	"kgpanel/wings/internal/version"
@@ -19,7 +20,7 @@ import (
 
 // Handler wires the wings HTTP API. Auth: X-KG-Token header or ?token= query
 // must equal the configured shared secret (subtle.ConstantTimeCompare-style).
-func Handler(token, dataDir, hostDataDir, updateURL string) http.Handler {
+func Handler(token, dataDir, hostDataDir, updateURL string, reg *metrics.Registry) http.Handler {
 	mux := http.NewServeMux()
 
 	// config: POST /v1/servers/{id}/config {image,startup,stop_command,env,ports,memory_mb,cpu_percent}
@@ -92,6 +93,18 @@ func Handler(token, dataDir, hostDataDir, updateURL string) http.Handler {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"id": id, "state": state})
+	})
+
+	// metrics: GET /v1/servers/{id}/metrics (rolling history from the sampler)
+	mux.HandleFunc("/v1/servers/{id}/metrics", func(w http.ResponseWriter, r *http.Request) {
+		if !checkAuth(w, r, token) {
+			return
+		}
+		id := r.PathValue("id")
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"id":      id,
+			"samples": reg.History(id),
+		})
 	})
 
 	// console: WS /v1/servers/{id}/console (streams container log lines)

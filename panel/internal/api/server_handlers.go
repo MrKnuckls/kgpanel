@@ -70,3 +70,24 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"id": serverID, "state": state})
 }
+
+// handleMetrics proxies the node's rolling resource history for a server.
+func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	serverID := r.PathValue("id")
+	sv := s.st.GetServer(serverID)
+	if sv == nil {
+		writeErr(w, http.StatusNotFound, "server not found")
+		return
+	}
+	n := s.st.GetNode(sv.NodeID)
+	if n == nil {
+		writeErr(w, http.StatusNotFound, "node not found")
+		return
+	}
+	samples, err := s.wings.Metrics(n, serverID)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"id": serverID, "samples": samples})
+}
