@@ -62,8 +62,9 @@ a.noline{text-decoration:none;color:inherit}
 <a href="#p7">Step 7 — Create your first game server</a>
 <a href="#p8">Step 8 — Open the server: power, console, live graphs</a>
 <a href="#p9">Step 9 — Change settings (ports, memory, CPU)</a>
-<a href="#p10">Step 10 — Put it on the internet with your own domain + SSL</a>
-<a href="#p11">Step 11 — If something looks wrong</a>
+<a href="#p10">Step 10 — Give a game its own database (FiveM etc.)</a>
+<a href="#p11">Step 11 — Put it on the internet with your own domain + SSL</a>
+<a href="#p12">Step 12 — If something looks wrong</a>
 </div>
 
 <a name="words"></a><h2><span class="step">★</span>Words you need to know</h2>
@@ -236,7 +237,27 @@ sudo mkdir -p /var/lib/wings</pre></li>
 <p>Below it, the <b>egg</b> box edits the game template itself (image, startup, stop, ports, variables) — affects every server using that egg.</p>
 <div class="check">Saved a change and the game still came back up? The rebuild worked. If the game doesn't restart, click ▶ start again.</div>
 
-<a name="p10"></a><h2><span class="step">STEP 10</span>Put it on the internet — your own domain + SSL</h2>
+<a name="p10"></a><h2><span class="step">STEP 10</span>Give a game its own database (FiveM and friends)</h2>
+<p>Some games keep their world saves in a <strong>database</strong> instead of files — FiveM (with the popular <code>oxmysql</code>/<code>mysql-async</code> scripts), MySQL-vaulted Minecraft, and similar. KGPanel has a built-in database switch: tick one box and it runs a private <strong>MariaDB</strong> on the same computer, makes a fresh database + username + password for that game, and hands them to the container as <code>KG_DB_*</code> settings.</p>
+<div class="note info">Your database stays <strong>on the same machine as the game</strong> (private Docker network <code>kggames-net</code>) — it is never exposed to the internet, and it doesn't touch your domain or SSL. That's the whole point: same box, Docker, no outside access.</div>
+<figure><img src="img/guide2-egg-db.png" style="width:100%"></figure><div class="shotcap" style="text-align:center;color:#8b949e;font-size:.78rem">Admin → eggs. The "needs a database" box + docker network field (put <code>kggames-net</code>).</div>
+<ol>
+<li>Admin → <strong>eggs</strong> → click the pencil (edit) on your game's template — or make a new egg.</li>
+<li>Tick <strong>☑ needs a database</strong>.</li>
+<li>For <strong>docker network</strong> put <code>kggames-net</code> (the built-in shared DB network). Save.</li>
+<li>In the game's console/startup config, use these environment variables it now receives:
+<pre>KG_DB_HOST     = db          (the database server — same computer!)
+KG_DB_PORT     = 3306
+KG_DB_NAME     = kg_&lt;server id&gt;
+KG_DB_USER     = kgu_&lt;server id&gt;
+KG_DB_PASSWORD = (random, per server)</pre></li>
+<li>For FiveM's <code>server.cfg</code>: <code>set mysql_connection_string "mysql://&lt;user&gt;:&lt;password&gt;@db:3306/&lt;database&gt;?charset=utf8mb4"</code>.</li>
+<li>Start the game. The first start takes an extra minute while the database spins up — after that it's automatic every boot.</li>
+</ol>
+<div class="check">Restarted the game and the console shows it connecting to <code>db:3306</code> without errors? You have a database. 🗄️</div>
+<div class="note warn">Only tick "needs a database" for games that actually use one. Games that save to files (like PalWorld) don't need it — unticked eggs run exactly as before, no DB container involved.</div>
+
+<a name="p11"></a><h2><span class="step">STEP 11</span>Put it on the internet — your own domain + SSL</h2>
 <p>Right now the panel is on your local network. To open it from anywhere with <b>https://yourname.com</b> and the padlock, use a free Cloudflare tunnel. It doesn't touch your router at all, and SSL is automatic.</p>
 <p><b>You need:</b> (1) a domain that's on Cloudflare (free at <code>cloudflare.com</code>), (2) an API token with zone-edit permission (Cloudflare dashboard → My Profile → API Tokens → Create Token → use the "Edit zone DNS" template), (3) your Cloudflare account ID (same page, top right).</p>
 <p>Then ONE command from a terminal on the panel's computer. Copy the one for your computer exactly, replacing the three YOUR bits:</p>
@@ -257,7 +278,7 @@ sudo mkdir -p /var/lib/wings</pre></li>
 <div class="check">Opened <code>https://panel.yourname.com</code> in your phone browser (data/WiFi, not the panel computer) and saw the padlock + login? You're on the internet. 🎉</div>
 <div class="note warn">The tunnel exposes only the PANEL. Your game ports (like 8211) stay local unless you forward them — that's the safe default. See <code>docs/INSTALL.md</code> §11 for the no-script dashboard version of this step.</div>
 
-<a name="p11"></a><h2><span class="step">STEP 11</span>If something looks wrong</h2>
+<a name="p12"></a><h2><span class="step">STEP 12</span>If something looks wrong</h2>
 <table>
 <tr><th>What you see</th><th>What it means / do this</th></tr>
 <tr><td>Panel window says <code>secret is required</code></td><td>The secret wasn't passed. Re-run the start command with <code>--secret</code> + your saved secret.</td></tr>
