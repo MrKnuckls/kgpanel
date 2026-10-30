@@ -172,16 +172,24 @@ func (r *Registry) push(id string, s Sample) {
 }
 
 // fsTotal returns the capacity in bytes of the filesystem containing path.
+// BusyBox df (the wings container is alpine) has no --output=size, so parse
+// the classic two-line form and take the 1-blocks column (field 2) of line 2.
 func fsTotal(ctx context.Context, path string) (uint64, error) {
-	out, err := exec.CommandContext(ctx, "df", "-B1", "--output=size", path).Output()
+	out, err := exec.CommandContext(ctx, "df", "-B1", path).Output()
 	if err != nil {
 		return 0, err
 	}
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	if len(lines) < 2 {
-		return 0, fmt.Errorf("df: unexpected output")
+	for _, ln := range lines {
+		fields := strings.Fields(ln)
+		// header line ("Filesystem 1-blocks Used Available Use% Mounted on") has no digits
+		if len(fields) >= 2 {
+			if n, perr := strconv.ParseUint(fields[1], 10, 64); perr == nil {
+				return n, nil
+			}
+		}
 	}
-	return strconv.ParseUint(strings.TrimSpace(lines[len(lines)-1]), 10, 64)
+	return 0, fmt.Errorf("df: no size column in output")
 }
 
 // dirBytes returns the total size in bytes under path (du-like).
