@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -27,13 +28,17 @@ func ContainerName(serverID string) string {
 }
 
 // EnsureExists creates the container if it is missing; idempotent.
-func EnsureExists(ctx context.Context, serverID, image string, env map[string]string, ports []string, memoryMB, cpuPercent int, startup string) (string, error) {
+// The server's files dir (<dataDir>/servers/<serverID>/files) is mounted at
+// /server and used as the workdir, so egg startups like "python main.py" see
+// the files managed through the panel file manager.
+func EnsureExists(ctx context.Context, dataDir, serverID, image string, env map[string]string, ports []string, memoryMB, cpuPercent int, startup string) (string, error) {
 	name := ContainerName(serverID)
 	inspectArgs := []string{"inspect", "-f", "{{.Id}}", name}
 	if _, err := run(ctx, inspectArgs...); err == nil {
 		return name, nil // already created
 	}
-	args := []string{"create", "--name", name, "--restart", "unless-stopped"}
+	filesDir := filepath.Join(dataDir, "servers", serverID, "files")
+	args := []string{"create", "--name", name, "--restart", "unless-stopped", "-w", "/server", "-v", filesDir + ":/server"}
 	if memoryMB > 0 {
 		args = append(args, "-m", fmt.Sprintf("%dm", memoryMB))
 	}

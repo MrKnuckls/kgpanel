@@ -57,7 +57,7 @@ func Handler(token, dataDir, updateURL string) http.Handler {
 			httpError(w, http.StatusBadRequest, "bad json")
 			return
 		}
-		ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 180*time.Second)
 		defer cancel()
 		if in.Signal == "start" {
 			// ensure the container exists first (create on first boot / after reboot)
@@ -66,7 +66,7 @@ func Handler(token, dataDir, updateURL string) http.Handler {
 				httpError(w, http.StatusBadRequest, "server config missing: "+err.Error())
 				return
 			}
-			if _, err := docker.EnsureExists(ctx, id, sp.Image, sp.Env, sp.Ports, sp.MemoryMB, sp.CPUPercent, sp.Startup); err != nil {
+			if _, err := docker.EnsureExists(ctx, dataDir, id, sp.Image, sp.Env, sp.Ports, sp.MemoryMB, sp.CPUPercent, sp.Startup); err != nil {
 				httpError(w, http.StatusBadGateway, err.Error())
 				return
 			}

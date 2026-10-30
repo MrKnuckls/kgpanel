@@ -19,7 +19,7 @@ type Client struct {
 }
 
 func New() *Client {
-	return &Client{http: &http.Client{Timeout: 15 * time.Second}}
+	return &Client{http: &http.Client{Timeout: 90 * time.Second}}
 }
 
 func urlQuery(s string) string { return url.QueryEscape(s) }
