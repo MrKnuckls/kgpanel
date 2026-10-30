@@ -34,6 +34,7 @@ type ServerSpec struct {
 	Ports      []string          `json:"ports"`
 	MemoryMB   int               `json:"memory_mb"`
 	CPUPercent int               `json:"cpu_percent"`
+	Recreate   bool              `json:"recreate,omitempty"`
 }
 
 func (c *Client) ServerConfig(n *store.Node, serverID string, sp ServerSpec) error {

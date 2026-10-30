@@ -231,6 +231,18 @@ func (s *Store) GetEgg(id string) *Egg {
 	return s.eggs[id]
 }
 
+// UpdateEgg applies fn to the egg with the given id and persists it.
+func (s *Store) UpdateEgg(id string, fn func(*Egg)) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, ok := s.eggs[id]
+	if !ok {
+		return fmt.Errorf("egg %s not found", id)
+	}
+	fn(e)
+	return s.save("eggs.json", s.eggs)
+}
+
 // --- servers ---
 
 func (s *Store) CreateServer(sv *Server) error {
@@ -256,6 +268,18 @@ func (s *Store) GetServer(id string) *Server {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.servers[id]
+}
+
+// UpdateServer applies fn to the server with the given id and persists it.
+func (s *Store) UpdateServer(id string, fn func(*Server)) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sv, ok := s.servers[id]
+	if !ok {
+		return fmt.Errorf("server %s not found", id)
+	}
+	fn(sv)
+	return s.save("servers.json", s.servers)
 }
 
 func (s *Store) SetServerContainer(id, containerID string) error {

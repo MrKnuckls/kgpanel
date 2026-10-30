@@ -23,8 +23,10 @@ import (
 func Handler(token, dataDir, hostDataDir, updateURL string, reg *metrics.Registry) http.Handler {
 	mux := http.NewServeMux()
 
-	// config: POST /v1/servers/{id}/config {image,startup,stop_command,env,ports,memory_mb,cpu_percent}
+	// config: POST /v1/servers/{id}/config {image,startup,stop_command,env,ports,memory_mb,cpu_percent,recreate}
 	// stores the container spec wings needs to (re)create the container.
+	// When recreate is true, wings also rebuilds the existing container so
+	// port/limit/image/startup changes take effect immediately.
 	mux.HandleFunc("/v1/servers/{id}/config", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			httpError(w, http.StatusMethodNotAllowed, "POST only")
@@ -33,14 +35,25 @@ func Handler(token, dataDir, hostDataDir, updateURL string, reg *metrics.Registr
 		if !checkAuth(w, r, token) {
 			return
 		}
-		var in srvconfig.Spec
+		var in struct {
+			srvconfig.Spec
+			Recreate bool `json:"recreate"`
+		}
 		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 			httpError(w, http.StatusBadRequest, "bad json")
 			return
 		}
-		if err := srvconfig.Save(dataDir, r.PathValue("id"), in); err != nil {
+		if err := srvconfig.Save(dataDir, r.PathValue("id"), in.Spec); err != nil {
 			httpError(w, http.StatusBadRequest, err.Error())
 			return
+		}
+		if in.Recreate {
+			ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
+			defer cancel()
+			if err := docker.Recreate(ctx, hostDataDir, r.PathValue("id"), in.Spec.Image, in.Spec.Env, in.Spec.Ports, in.Spec.MemoryMB, in.Spec.CPUPercent, in.Spec.Startup); err != nil {
+				httpError(w, http.StatusBadGateway, err.Error())
+				return
+			}
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 	})

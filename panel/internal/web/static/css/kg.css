@@ -179,6 +179,8 @@ a:hover { text-decoration: underline; }
 .connect-box { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; }
 .connect-label { text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px; color: var(--muted, #8b949e); }
 .connect-addr { font-family: var(--mono, "JetBrains Mono", monospace); color: var(--accent); user-select: all; }
+.settings-form label { display: block; margin-bottom: 10px; font-size: 12px; color: var(--muted, #8b949e); }
+.settings-form input { width: 100%; margin-top: 4px; }
 .spark-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
 .spark-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
 .spark-title { text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px; color: var(--muted, #8b949e); margin-bottom: 4px; }

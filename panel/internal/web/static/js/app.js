@@ -187,6 +187,7 @@ document.querySelectorAll(".dtab").forEach((b) => b.addEventListener("click", ()
   if (b.dataset.tab === "files") loadFiles();
   if (b.dataset.tab === "schedules") loadSchedules();
   if (b.dataset.tab === "backups") loadBackups();
+  if (b.dataset.tab === "settings") loadSettings();
   if (b.dataset.tab === "info") loadInfo();
 }));
 
@@ -335,6 +336,64 @@ async function loadInfo() {
     ].map(([k, v]) => `<div class="info-item"><div class="k">${k}</div><div class="v">${esc(v || "—")}</div></div>`).join("");
   } catch (e) {}
 }
+
+/* ---------- settings (server + egg) ---------- */
+let currentEggId = null;
+async function loadSettings() {
+  try {
+    const [svd, eggd] = await Promise.all([jfetch("/servers"), jfetch("/eggs")]);
+    const sv = svd.servers.find((x) => x.id === currentServer);
+    if (!sv) return;
+    $("setMem").value = sv.memory_mb;
+    $("setCpu").value = sv.cpu_percent;
+    $("setPorts").value = (sv.ports || []).join(",");
+    const egg = eggd.eggs.find((e) => e.id === sv.egg_id);
+    if (egg) {
+      currentEggId = egg.id;
+      $("setEggName").value = egg.name;
+      $("setEggImage").value = egg.image;
+      $("setEggStartup").value = egg.startup;
+      $("setEggStop").value = egg.stop_command || "";
+      $("setEggPorts").value = (egg.ports || []).join(",");
+      $("setEggVars").value = (egg.variables || []).join(",");
+    }
+    $("setMsg").textContent = "";
+  } catch (e) { $("setMsg").textContent = e.message; }
+}
+$("setSave").addEventListener("click", async () => {
+  try {
+    $("setMsg").textContent = "saving & rebuilding…";
+    await jfetch("/servers/" + currentServer + "/settings", {
+      method: "POST",
+      body: JSON.stringify({
+        memory_mb: parseInt($("setMem").value, 10) || undefined,
+        cpu_percent: parseInt($("setCpu").value, 10),
+        ports: $("setPorts").value.split(",").map((s) => s.trim()).filter(Boolean),
+      }),
+    });
+    $("setMsg").textContent = "saved — rebuilding container…";
+    setTimeout(() => { $("setMsg").textContent = "done."; refreshStatus(); loadSettings(); }, 4000);
+  } catch (e) { $("setMsg").textContent = "failed: " + e.message; }
+});
+$("setReload").addEventListener("click", loadSettings);
+$("setEggSave").addEventListener("click", async () => {
+  try {
+    $("setEggMsg").textContent = "saving egg…";
+    await jfetch("/eggs/update", {
+      method: "POST",
+      body: JSON.stringify({
+        id: currentEggId,
+        name: $("setEggName").value.trim(),
+        image: $("setEggImage").value.trim(),
+        startup: $("setEggStartup").value.trim(),
+        stop_command: $("setEggStop").value.trim(),
+        ports: $("setEggPorts").value.split(",").map((s) => s.trim()).filter(Boolean),
+        variables: $("setEggVars").value.split(",").map((s) => s.trim()).filter(Boolean),
+      }),
+    });
+    $("setEggMsg").textContent = "egg saved.";
+  } catch (e) { $("setEggMsg").textContent = "failed: " + e.message; }
+});
 
 /* ---------- create modal ---------- */
 async function openCreate() {

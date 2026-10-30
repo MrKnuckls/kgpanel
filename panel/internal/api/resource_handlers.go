@@ -110,7 +110,7 @@ func (s *Server) handleCreateServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// push the container spec to wings so it can create the container on start
-	s.pushServerConfig(&in)
+	s.pushServerConfig(&in, false)
 	s.st.Audit(in.OwnerID, "server_create", in.Name, "")
 	writeJSON(w, http.StatusCreated, map[string]interface{}{"id": in.ID})
 }
@@ -118,7 +118,8 @@ func (s *Server) handleCreateServer(w http.ResponseWriter, r *http.Request) {
 // pushServerConfig resolves the server's egg + node and pushes the container
 // spec to wings. Failures are logged, not fatal — a wings that's briefly down
 // must not block server creation (the spec is re-pushed on start as a fallback).
-func (s *Server) pushServerConfig(sv *store.Server) {
+// recreate forces wings to rebuild the container (for port/limit/image changes).
+func (s *Server) pushServerConfig(sv *store.Server, recreate bool) {
 	egg := s.st.GetEgg(sv.EggID)
 	if egg == nil {
 		return
@@ -135,8 +136,83 @@ func (s *Server) pushServerConfig(sv *store.Server) {
 		Ports:      sv.Ports,
 		MemoryMB:   sv.MemoryMB,
 		CPUPercent: sv.CPUPercent,
+		Recreate:   recreate,
 	}
 	if err := s.wings.ServerConfig(n, sv.ID, sp); err != nil {
 		log.Printf("pushServerConfig %s: %v", sv.Name, err)
 	}
+}
+
+// handleServerSettings updates a server's own settings (memory, cpu, ports, env)
+// and pushes the new spec to wings with recreate so the running container picks
+// up port/limit changes.
+func (s *Server) handleServerSettings(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var in struct {
+		MemoryMB   int               `json:"memory_mb"`
+		CPUPercent int               `json:"cpu_percent"`
+		Ports      []string          `json:"ports"`
+		Env        map[string]string `json:"env"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad json")
+		return
+	}
+	if err := s.st.UpdateServer(id, func(sv *store.Server) {
+		if in.MemoryMB > 0 {
+			sv.MemoryMB = in.MemoryMB
+		}
+		if in.CPUPercent >= 0 {
+			sv.CPUPercent = in.CPUPercent
+		}
+		if in.Ports != nil {
+			sv.Ports = in.Ports
+		}
+		if in.Env != nil {
+			sv.Env = in.Env
+		}
+	}); err != nil {
+		writeErr(w, http.StatusNotFound, "server not found")
+		return
+	}
+	sv := s.st.GetServer(id)
+	s.pushServerConfig(sv, true)
+	s.st.Audit(userFromRequest(r), "server_settings", sv.Name, "memory/cpu/ports/env updated")
+	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
+}
+
+// handleUpdateEgg edits an existing egg template (image, startup, ports, vars).
+func (s *Server) handleUpdateEgg(w http.ResponseWriter, r *http.Request) {
+	var in store.Egg
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad json")
+		return
+	}
+	id := in.ID
+	if id == "" || in.Name == "" || in.Image == "" || in.Startup == "" {
+		writeErr(w, http.StatusBadRequest, "id, name, image and startup required")
+		return
+	}
+	if err := s.st.UpdateEgg(id, func(e *store.Egg) {
+		e.Name = in.Name
+		e.Description = in.Description
+		e.Image = in.Image
+		e.Startup = in.Startup
+		e.StopCommand = in.StopCommand
+		e.Variables = in.Variables
+		e.Ports = in.Ports
+	}); err != nil {
+		writeErr(w, http.StatusNotFound, "egg not found")
+		return
+	}
+	// push the updated spec to every server that uses this egg so the change
+	// propagates (recreate=false — port changes to an egg should apply on next
+	// start; for immediate effect the user edits server settings).
+	for _, sv := range s.st.ListServers() {
+		if sv.EggID == id {
+			s.pushServerConfig(sv, false)
+		}
+	}
+	s.st.Audit(userFromRequest(r), "egg_update", in.Name, "")
+	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }

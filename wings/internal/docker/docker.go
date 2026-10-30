@@ -81,6 +81,19 @@ func EnsureExists(ctx context.Context, hostDataDir, serverID, image string, env 
 	return name, nil
 }
 
+// Recreate removes the container if present, then recreates it from the given
+// spec. Used when server settings (ports, limits, image, startup) change —
+// those are baked in at create time, so a running container must be rebuilt.
+// The server's files dir bind-mount survives (it is outside the container).
+func Recreate(ctx context.Context, hostDataDir, serverID, image string, env map[string]string, ports []string, memoryMB, cpuPercent int, startup string) error {
+	name := ContainerName(serverID)
+	if _, err := run(ctx, "rm", "-f", name); err != nil && !strings.Contains(err.Error(), "No such") {
+		return err
+	}
+	_, err := EnsureExists(ctx, hostDataDir, serverID, image, env, ports, memoryMB, cpuPercent, startup)
+	return err
+}
+
 // Power maps a panel signal to docker.
 func Power(ctx context.Context, serverID, signal string, stopTimeout int) error {
 	name := ContainerName(serverID)
