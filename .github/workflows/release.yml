@@ -62,9 +62,11 @@ jobs:
 
       - name: Build
         working-directory: ${{ matrix.dir }}
+        env:
+          KGVER: ${{ github.ref_name }}
         run: |
           CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
-            go build -trimpath -ldflags="-s -w" \
+            go build -trimpath -ldflags="-s -w -X kgpanel/${{ matrix.dir }}/internal/version.Version=${KGVER}" \
             -o ../${{ matrix.target }}${{ matrix.ext }} ${{ matrix.pkg }}
 
       - name: Compress (linux/mac)
