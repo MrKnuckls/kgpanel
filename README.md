@@ -31,6 +31,16 @@ eggs → deploying a first server → securing, backups, troubleshooting.
 
 No database, no PHP, no Redis — just one binary and a JSON data directory.
 
+## Screenshots
+
+| Sign in | Dashboard |
+|---|---|
+| ![sign in](docs/img/screenshot-login.png) | ![dashboard](docs/img/screenshot-dashboard.png) |
+
+| Server detail (power + console) | Admin → updates (self-update) |
+|---|---|
+| ![server detail](docs/img/screenshot-server.png) | ![admin updates](docs/img/screenshot-updates.png) |
+
 ## Quick start (Docker)
 
 ```bash
