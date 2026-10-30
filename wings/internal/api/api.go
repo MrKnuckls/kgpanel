@@ -12,11 +12,13 @@ import (
 	"golang.org/x/net/websocket"
 
 	"kgpanel/wings/internal/docker"
+	"kgpanel/wings/internal/update"
+	"kgpanel/wings/internal/version"
 )
 
 // Handler wires the wings HTTP API. Auth: X-KG-Token header or ?token= query
 // must equal the configured shared secret (subtle.ConstantTimeCompare-style).
-func Handler(token, dataDir string) http.Handler {
+func Handler(token, dataDir, updateURL string) http.Handler {
 	mux := http.NewServeMux()
 
 	// power: POST /v1/servers/{id}/power {signal}
@@ -94,9 +96,33 @@ func Handler(token, dataDir string) http.Handler {
 		_ = ws.Close()
 	}))
 
+	// update: GET /v1/update/check, POST /v1/update (self-update)
+	mux.HandleFunc("/v1/update/check", func(w http.ResponseWriter, r *http.Request) {
+		if !checkAuth(w, r, token) {
+			return
+		}
+		st, _ := update.Latest(updateURL)
+		writeJSON(w, http.StatusOK, st)
+	})
+	mux.HandleFunc("/v1/update", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			httpError(w, http.StatusMethodNotAllowed, "POST only")
+			return
+		}
+		if !checkAuth(w, r, token) {
+			return
+		}
+		st, err := update.Apply(updateURL)
+		if err != nil {
+			httpError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, st)
+	})
+
 	// health
 	mux.HandleFunc("/v1/health", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "data": dataDir})
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "data": dataDir, "version": version.Version})
 	})
 
 	return logWrap(mux)

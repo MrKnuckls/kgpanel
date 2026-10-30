@@ -81,6 +81,7 @@
     <ul class="tabs">
       <li data-tab="nodes" class="active">nodes</li>
       <li data-tab="eggs">eggs</li>
+      <li data-tab="updates">updates</li>
       <li data-tab="audit">audit</li>
     </ul>
     <div id="tab-nodes" class="tab">
@@ -103,6 +104,14 @@
         <button class="btn primary" type="submit">add egg</button>
       </form>
       <table id="eggTable"><thead><tr><th>name</th><th>image</th><th>startup</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div id="tab-updates" class="tab" style="display:none">
+      <div id="updStatus" class="mono" style="margin-bottom:12px">checking…</div>
+      <div class="row" style="gap:8px">
+        <button class="btn" id="updCheck">check for update</button>
+        <button class="btn primary" id="updApply">apply update</button>
+      </div>
+      <p style="margin-top:10px;color:var(--muted,#8b949e);font-size:12px">releases are published from GitHub — the panel downloads the binary for its platform, verifies the checksum, swaps itself and restarts. keep this page open a few seconds after applying.</p>
     </div>
     <div id="tab-audit" class="tab" style="display:none">
       <table id="auditTable"><thead><tr><th>time</th><th>actor</th><th>action</th><th>target</th></tr></thead><tbody></tbody></table>

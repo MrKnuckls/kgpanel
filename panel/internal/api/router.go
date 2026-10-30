@@ -35,6 +35,8 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.Handle("/api/servers/{id}/power", s.auth(http.HandlerFunc(s.handlePower)))
 	mux.Handle("/api/servers/{id}/status", s.auth(http.HandlerFunc(s.handleStatus)))
 	mux.Handle("/api/audit", s.auth(http.HandlerFunc(s.handleAudit)))
+	mux.Handle("/api/update/check", s.auth(http.HandlerFunc(s.handleUpdateCheck)))
+	mux.Handle("/api/update", s.auth(http.HandlerFunc(s.handleUpdate)))
 
 	// websocket console proxy: browser -> panel -> wings
 	mux.Handle("/api/console/{id}", s.auth(nhooyr.Handler(s.handleConsoleProxy)))

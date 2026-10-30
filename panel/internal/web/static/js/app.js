@@ -122,7 +122,6 @@ $("createForm").addEventListener("submit", async (ev) => {
 });
 
 /* ---------- admin ---------- */
-$("adminBtn").addEventListener("click", () => { $("admin").style.display = "flex"; loadNodes(); loadEggs(); loadAudit(); });
 document.querySelectorAll(".tabs li").forEach((t) => t.addEventListener("click", () => {
   document.querySelectorAll(".tabs li").forEach((x) => x.classList.remove("active"));
   t.classList.add("active");
@@ -176,6 +175,30 @@ async function loadAudit() {
   $("auditTable").querySelector("tbody").innerHTML = d.audit.map((a) => `
     <tr><td class="mono">${new Date(a.time).toLocaleString()}</td><td>${a.actor}</td><td>${a.action}</td><td class="mono">${a.target}</td></tr>`).join("");
 }
+
+/* ---------- updates ---------- */
+$("adminBtn").addEventListener("click", () => { $("admin").style.display = "flex"; loadNodes(); loadEggs(); loadAudit(); loadUpdates(); });
+async function loadUpdates() {
+  const el = $("updStatus");
+  el.textContent = "checking…";
+  try {
+    const d = await jfetch("/update/check");
+    const cur = d.current.replace(/^v/, "");
+    const lat = d.latest.replace(/^v/, "");
+    if (d.update_needed) el.textContent = `v${cur} → v${lat} (${d.asset}) — update available`;
+    else el.textContent = `up to date (v${cur})`;
+  } catch (e) { el.textContent = "feed unreachable — " + e.message; }
+}
+$("updCheck").addEventListener("click", loadUpdates);
+$("updApply").addEventListener("click", async () => {
+  if (!confirm("apply update? the panel will swap its binary and restart.")) return;
+  const el = $("updStatus");
+  el.textContent = "downloading…";
+  try {
+    const d = await jfetch("/update", { method: "POST" });
+    el.textContent = d.message || "done";
+  } catch (e) { el.textContent = "update failed — " + e.message; }
+});
 
 $("logout").addEventListener("click", () => { localStorage.removeItem("kg_token"); location.href = "/login.html"; });
 

@@ -7,17 +7,26 @@ import (
 
 	"kgpanel/panel/internal/auth"
 	"kgpanel/panel/internal/store"
+	"kgpanel/panel/internal/update"
 	"kgpanel/panel/internal/wingsclient"
 )
 
 type Server struct {
-	st     *store.Store
-	secret string
-	wings  *wingsclient.Client
+	st        *store.Store
+	secret    string
+	wings     *wingsclient.Client
+	updateURL string
 }
 
 func New(st *store.Store, secret string) *Server {
-	return &Server{st: st, secret: secret, wings: wingsclient.New()}
+	return &Server{st: st, secret: secret, wings: wingsclient.New(), updateURL: update.DefaultFeed}
+}
+
+// SetUpdateURL overrides the release feed (env KGPANEL_UPDATE_URL).
+func (s *Server) SetUpdateURL(u string) {
+	if u != "" {
+		s.updateURL = u
+	}
 }
 
 // userFromRequest resolves the authenticated user id (set by middleware) or "".

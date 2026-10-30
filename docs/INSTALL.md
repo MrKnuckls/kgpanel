@@ -231,7 +231,56 @@ You'll see it in the grid. Open it:
 
 ---
 
-## 10. Securing it (recommended)
+## 10. Auto-updating (push an upgrade, all clients follow)
+
+KGPanel ships with a **self-updater built in**. When you publish a new release
+(with the exact tag format `v1.2.3`), every installed panel and wings can
+update **itself** — no SSH, no re-downloading, no manual binary swap.
+
+How it works:
+
+1. You tag a release → GitHub Actions builds all 6 platform binaries, generates
+   `checksums.txt` (sha256 per binary) and publishes the release.
+2. Each panel/wings checks the release feed (`/api/update/check` on panel,
+   `/v1/update/check` on wings) — by default GitHub's latest release, or a
+   custom feed via `--update-url` / `KGPANEL_UPDATE_URL` / `KGWINGS_UPDATE_URL`.
+3. If a newer version exists, it downloads the binary **matching its own
+   platform** (panel on Windows fetches `kgpanel-windows-amd64.exe`, etc),
+   verifies the sha256 against `checksums.txt`, swaps the running binary, and
+   restarts itself.
+
+### In the UI
+
+admin → **updates** tab → *check for update* / *apply update*. The panel tells
+you what version it found and swaps itself with one click.
+
+### From the CLI
+
+```bash
+# panel
+curl -X POST http://localhost:8080/api/update -H "Authorization: Bearer <token>"
+
+# wings
+curl -X POST http://localhost:8081/v1/update -H "X-KG-Token: <wings-token>"
+```
+
+### Publishing a release
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+That's it — Actions builds, checksums, and attaches to a GitHub release, and
+all your deployed panels/wings pick it up on their next check.
+
+> Safety: the swap is atomic. On Windows the running `.exe` is renamed to
+> `.old` first, the new binary moved in, the new process started, then the old
+> exits — a failed swap rolls back. Checksums are verified before anything is
+> replaced; a mismatch aborts the update.
+
+---
+
+## 11. Securing it (recommended)
 
 - Put the panel behind a reverse proxy with TLS (Caddy/Nginx) or Cloudflare
   Tunnel, and add access control.
@@ -242,7 +291,7 @@ You'll see it in the grid. Open it:
 
 ---
 
-## 11. Backups & lifecycle
+## 12. Backups & lifecycle
 
 The panel's state lives entirely in the files under `--data`:
 
@@ -253,7 +302,7 @@ copy — writes are atomic rename-replace). Restore = same directory back.
 
 ---
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
@@ -267,7 +316,7 @@ copy — writes are atomic rename-replace). Restore = same directory back.
 
 ---
 
-## 13. Windows .exe notes
+## 14. Windows .exe notes
 
 The Windows binaries are real native executables — no WSL, no emulation. Both
 panel and wings run as console processes under Windows.

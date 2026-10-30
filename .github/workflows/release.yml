@@ -82,10 +82,31 @@ jobs:
           path: |
             ${{ matrix.target }}.tar.gz
             ${{ matrix.target }}.zip
+            ${{ matrix.target }}${{ matrix.ext }}
+
+  checksums:
+    name: checksums
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Generate checksums.txt
+        run: |
+          cd assets
+          # hash the raw binaries (the self-updater verifies these names)
+          sha256sum kgpanel-linux-amd64 kgpanel-linux-arm64 kgpanel-windows-amd64.exe wings-linux-amd64 wings-linux-arm64 wings-windows-amd64.exe > checksums.txt
+          cat checksums.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: assets/checksums.txt
 
   release:
     name: Release
-    needs: build
+    needs: [build, checksums]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4

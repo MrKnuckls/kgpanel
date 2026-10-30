@@ -8,6 +8,7 @@ import (
 	"kgpanel/panel/internal/api"
 	"kgpanel/panel/internal/config"
 	"kgpanel/panel/internal/store"
+	"kgpanel/panel/internal/version"
 	"kgpanel/panel/internal/web"
 )
 
@@ -21,8 +22,9 @@ func main() {
 		log.Fatalf("store: %v", err)
 	}
 	srv := api.New(st, cfg.Secret)
+	srv.SetUpdateURL(cfg.UpdateURL)
 	ui := web.UI() // embedded html/css/js
-	log.Printf("KGPanel listening on %s (data: %s)", cfg.Listen, cfg.Data)
+	log.Printf("KGPanel %s listening on %s (data: %s)", version.Version, cfg.Listen, cfg.Data)
 	if err := http.ListenAndServe(cfg.Listen, srv.Handler(ui)); err != nil {
 		log.Printf("exiting: %v", err)
 		os.Exit(1)
