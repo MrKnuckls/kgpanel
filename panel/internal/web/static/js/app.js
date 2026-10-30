@@ -94,6 +94,9 @@ document.querySelectorAll("[data-power]").forEach((b) => b.addEventListener("cli
     setBadge("starting"); // immediate visual feedback while the action runs
     await jfetch("/servers/" + currentServer + "/power", { method: "POST", body: JSON.stringify({ signal }) });
     setTimeout(refreshStatus, 1500);
+    // the power action tore down the old log stream — reconnect the console
+    // after a beat so start/restart output actually shows up.
+    setTimeout(connectConsole, 2500);
   } catch (e) { alert(e.message); }
 }));
 document.querySelectorAll(".dtab").forEach((b) => b.addEventListener("click", () => {
@@ -122,7 +125,25 @@ function connectConsole() {
     box.scrollTop = box.scrollHeight;
     while (box.childElementCount > 3000) box.removeChild(box.firstChild);
   };
-  ws.onclose = () => { if (!box.childElementCount) box.innerHTML = `<div class="term-line muted">console disconnected (server stopped?)</div>`; };
+  ws.onclose = () => {
+    if (!box.childElementCount) box.innerHTML = `<div class="term-line muted">console disconnected (server stopped?)</div>`;
+    // a live server shouldn't drop its stream — if the container is still
+    // running, reconnect so a brief wings/container blip doesn't leave a
+    // dead console. If it's stopped, leave the disconnected message.
+    let tries = 0;
+    const retry = setInterval(async () => {
+      if (++tries > 5 || !currentServer || (ws && ws.readyState <= 1)) { clearInterval(retry); return; }
+      try {
+        const d = await jfetch("/servers/" + currentServer + "/status");
+        if (d.state === "running" || d.state === "starting") {
+          connectConsole();
+          clearInterval(retry);
+        } else if (d.state === "stopped") {
+          clearInterval(retry);
+        }
+      } catch (e) { clearInterval(retry); }
+    }, 3000);
+  };
   ws.onerror = () => { box.innerHTML = `<div class="term-line err">console error — check wings is up</div>`; };
 }
 $("cmd").addEventListener("keydown", (e) => {
