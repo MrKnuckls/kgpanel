@@ -153,7 +153,8 @@ function showConnect(sv) {
   let nodeHost = (sv.node_url || "").replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   if (nodeHost.includes(":")) nodeHost = nodeHost.split(":")[0]; // strip wings port (8081)
   const ports = (sv.ports || []);
-  const first = ports[0] ? ports[0].replace(/\/.*$/, "").replace(/^\d+:?/, "") : "";
+  // ports look like "8211/udp" (container port). Take the numeric part for the join address.
+  const first = ports[0] ? (ports[0].match(/^(\d+)/) || [])[1] || "" : "";
   const proto = ports[0] && ports[0].includes("/udp") ? " (udp)" : "";
   if (!nodeHost || !first) { box.style.display = "none"; return; }
   addr.textContent = `${nodeHost}:${first}${proto ? " " + proto : ""}`;
