@@ -10,6 +10,9 @@ may know (Pterodactyl/Pelican style), but KGPanel has **no database, no PHP,
 no Redis** — data lives in plain JSON files and everything is a single Go
 binary, so there is far less to break.
 
+> Prefer pictures? See the **screenshot walkthrough** at
+> [`docs/GUIDE.html`](GUIDE.html) — open it in a browser and follow along.
+
 Here's what the panel looks like. (Screenshots are from the dev build with
 sample data — your install will look the same.)
 

@@ -1,0 +1,159 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KGPanel — Install, Domain &amp; SSL Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface-hover:#1c2333;--border:#30363d;--text:#e6edf3;--muted:#8b949e;--accent:#39d353;--gold:#ffb000;--red:#ff5555}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;line-height:1.6;padding:40px 20px 80px}
+.wrap{max-width:860px;margin:0 auto}
+h1,h2,h3{font-family:Rajdhani,sans-serif;font-weight:700;letter-spacing:.3px}
+h1{font-size:2.3rem;margin-bottom:6px;color:#fff}
+.tag{color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:.8rem;margin-bottom:24px}
+h2{font-size:1.5rem;margin:48px 0 12px;padding-top:16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
+h2 .n{display:inline-flex;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#000;font-family:'JetBrains Mono';font-size:.9rem;align-items:center;justify-content:center;flex:none}
+h3{font-size:1.05rem;margin:20px 0 8px;color:var(--gold)}
+p{margin:8px 0}
+.muted{color:var(--muted)}
+code{font-family:'JetBrains Mono',monospace;background:var(--surface);border:1px solid var(--border);padding:1px 6px;border-radius:4px;font-size:.85em;color:#a5d6a7}
+pre{background:#010409;border:1px solid var(--border);border-radius:8px;padding:14px 16px;overflow:auto;font-family:'JetBrains Mono';font-size:.82rem;line-height:1.55;margin:10px 0}
+pre code{background:none;border:none;padding:0;color:#c9d1d9}
+.kbd{font-family:'JetBrains Mono';background:var(--surface-hover);border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:0 6px;font-size:.8em}
+figure{margin:16px 0}
+figure img{border:1px solid var(--border);border-radius:8px;display:block;box-shadow:0 4px 24px rgba(0,0,0,.4)}
+figcaption{color:var(--muted);font-size:.8rem;text-align:center;margin-top:6px}
+.note{border-left:3px solid var(--accent);background:var(--surface);padding:10px 14px;border-radius:0 8px 8px 0;margin:14px 0;font-size:.92rem}
+.warn{border-left-color:var(--gold)}
+.side{display:flex;flex:auto;gap:18px;align-items:flex-start}
+.side pre{flex:1}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:.88rem}
+th,td{border:1px solid var(--border);padding:8px 12px;text-align:left}
+th{background:var(--surface);font-family:Rajdhani;font-weight:700;letter-spacing:.5px;text-transform:uppercase;font-size:.78rem}
+tr:nth-child(even) td{background:#0b1017}
+.flag{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin:10px 0}
+.flag .k{color:var(--accent);font-weight:600}
+a{color:var(--accent)}
+.toc{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;margin:18px 0;font-size:.92rem}
+.toc a{color:var(--text);text-decoration:none;padding:4px 0;border-bottom:1px dashed var(--border)}
+.toc a:hover{color:var(--accent)}
+.step{margin:6px 0}
+.topbar{display:flex;align-items:center;gap:14px;margin-bottom:26px}
+.logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#39d353,#2da44e);display:flex;align-items:center;justify-content:center;font-family:Rajdhani;font-weight:700;font-size:1.5rem;color:#000;flex:none}
+</style></head><body><div class="wrap">
+
+<div class="topbar"><div class="logo">K</div><div><h1>KGPanel — Install, Domain &amp; SSL</h1></div></div>
+<div class="tag">self-hosted game-server panel · one binary · no database · works on Linux / macOS / Windows</div>
+
+<p>KGPanel is a game-server management panel: a web UI + API (<b>panel</b>) and a per-node agent (<b>wings</b>) that creates and runs each game in its own Docker container with memory &amp; CPU caps. Everything is a small Go binary plus a JSON data directory — no PHP, no database, no Redis.</p>
+
+<p>This walkthrough takes you end to end: <b>install → first run → add a game → point a domain at it with free SSL</b>. Screenshots are from a live KGPanel install.</p>
+
+<div class="toc">
+<a href="#s1">1. Requirements</a><a href="#s2">2. Download / build</a>
+<a href="#s3">3. Install the panel</a><a href="#s4">4. First run</a>
+<a href="#s5">5. Install wings</a><a href="#s6">6. Add your node</a>
+<a href="#s7">7. Add an egg</a><a href="#s8">8. Create a server</a>
+<a href="#s9">9. The dashboard</a><a href="#s10">10. Server settings</a>
+<a href="#s11">11. Domain + SSL (any OS)</a><a href="#s12">12. Verify + fix</a>
+</div>
+
+<a id="s1"></a><h2><span class="n">1</span>Requirements</h2>
+<table>
+<tr><th>Part</th><th>Minimum</th><th>Notes</th></tr>
+<tr><td><b>Panel host</b></td><td>512 MB RAM, 200 MB disk</td><td>Linux/Windows/macOS; needs port <code>8080</code></td></tr>
+<tr><td><b>Wings node</b></td><td>2 GB RAM + your games</td><td>Linux or Windows w/ Docker; port <code>8081</code> + game ports; <b>Docker Engine</b> required</td></tr>
+<tr><td><b>Domain (optional)</b></td><td>—</td><td>a domain on Cloudflare for HTTPS (section 11)</td></tr>
+</table>
+<div class="note">Each game runs in its own capped container, so one box can host many games safely.</div>
+
+<a id="s2"></a><h2><span class="n">2</span>Download or build</h2>
+<p>Grab the latest from the <b>Releases</b> page on GitHub (<code>kgpanel-linux-amd64</code>, <code>kgpanel-windows-amd64.exe</code>, <code>wings-linux-amd64</code>, …). Or build from source:</p>
+<pre><code>git clone https://github.com/MrKnuckls/kgpanel.git
+cd kgpanel
+make build      # produces dist/kgpanel and dist/wings</code></pre>
+
+<a id="s3"></a><h2><span class="n">3</span>Install the panel</h2>
+<h3>Binary (Linux)</h3>
+<pre><code>sudo install -m 0755 kgpanel-linux-amd64 /usr/local/bin/kgpanel
+sudo mkdir -p /var/lib/kgpanel
+openssl rand -hex 32                 # <b>save this secret</b>
+sudo kgpanel --listen :8080 --data /var/lib/kgpanel --secret YOUR_SECRET</code></pre>
+<p class="muted">See <code>docs/INSTALL.md</code> for the systemd service unit, the Windows NSSM service, and the Docker Compose option. To log in later you'll need the admin account you create on first run (section 4), not the secret above.</p>
+
+<a id="s4"></a><h2><span class="n">4</span>First run — create your admin</h2>
+<p>Open <code>http://&lt;your-ip&gt;:8080</code>. Because no account exists yet, the sign-in page shows the <b>setup form</b> — any username + 8+ char password creates your admin:</p>
+<img src="img/guide-login.png" style="width:100%;border:1px solid var(--border);border-radius:8px" alt="setup / login page"/>
+<div class="note">Setup only appears while there are <b>zero</b> users. After that, logins are verified normally. The profile chip in the top bar shows <code>you · admin</code>.</div>
+
+<a id="s5"></a><h2><span class="n">5</span>Install wings (the game node)</h2>
+<pre><code>sudo install -m 0755 wings-linux-amd64 /usr/local/bin/wings
+sudo mkdir -p /var/lib/wings
+# systemd unit (see INSTALL.md); then:
+sudo kgpanel 2>/dev/null; sudo wings --listen :8081 --token YOUR_WINGS_TOKEN --data /var/lib/wings</code></pre>
+<p class="muted">Windows: install Docker Desktop, put docker on your PATH, run the wing.exe with the same flags. <code>http://&lt;wings-host&gt;:8081/v1/health</code> should return <code>{"status":"ok",…}</code>.</p>
+
+<a id="s6"></a><h2><span class="n">6</span>Add your node in the panel</h2>
+<p>Go to <b>admin → nodes</b> and add the wings box: a name, its URL (<code>http://&lt;wings-host&gt;:8081</code>), and the same wings token you set above.</p>
+<img src="img/guide-nodes.png" style="width:100%;border:1px solid var(--border);border-radius:8px" alt="admin nodes"/>
+
+<a id="s7"></a><h2><span class="n">7</span>Add an egg (game template)</h2>
+<p>Back in <b>admin → eggs</b>: name, docker image, startup command, stop command, exposed ports, and template variables. Ready-made eggs ship in <code>eggs/</code>.</p>
+<img src="img/guide-eggs.png" style="width:100%;border:1px solid var(--border);border-radius:8px" alt="admin eggs"/>
+
+<a id="s8"></a><h2><span class="n">8</span>Create your first server</h2>
+<p><b>+ new server</b> → pick egg + node + node → set memory + CPU + ports → create. It appears in the grid and starts with the power button.</p>
+<img src="img/guide-dashboard.png" style="width:100%;border:1px solid var(--border);border-radius:8px" alt="dashboard"/>
+
+<a id="s9"></a><h2><span class="n">9</span>The dashboard &amp; live graphs</h2>
+<p>Open a server: <b>power/restart/stop</b> controls, a live <b>console</b>, and four live graphs — CPU, memory, network, disk — sampled every 5s from the real container. The status badge reflects what wings actually observes, so a running game never shows offline. The disk card shows used <i>and</i> total drive capacity. The <b>connect address</b> under the server name (with a copy button) tells players where to join.</p>
+<img src="img/guide-dashboard.png" style="width:100%;border:1px solid var(--border);border-radius:8px" alt="server detail with live graphs"/>
+
+<a id="s10"></a><h2><span class="n">10</span>Change ports / memory / the egg — in the panel</h2>
+<p>The <b>settings</b> tab edits a server's memory, CPU %, and ports, plus its egg template (image, startup, stop, ports, variables). Save &amp; apply rebuilds the container so the change takes effect immediately — <b>keeping the server running</b> if it was up.</p>
+<img src="img/guide-settings.png" style="width:100%;border:1px solid var(--border);border-radius:8px" alt="server settings"/>
+<div class="note warn">This is all in KGPanel — no router port-forwarding needed to change ports on a game. Ports are <b>explicit</b> (e.g. <code>8211:8211/udp</code>) so the connect address stays fixed.</div>
+
+<a id="s11"></a><h2><span class="n">11</span>Add a domain + free SSL (works on any OS)</h2>
+<p>For a public panel, point a domain (already on Cloudflare) at your panel. Cloudflare runs a <b>tunnel</b> from your panel to the edge and <b>serves SSL automatically</b> — no certs to buy, no ports to open, no router config.</p>
+
+<h3>Fastest — one command</h3>
+<p>Three values: an API token (My Profile → API Tokens, zone-edit perms), your account ID (same page), and your domain.</p>
+<p><b>Linux / macOS / WSL:</b></p>
+<pre><code>bash &lt;(curl -fsSL https://raw.githubusercontent.com/MrKnuckls/kgpanel/main/deploy/kgpanel-cloudflare.sh) \
+  --domain panel.example.com --cf-token "$CF_TOKEN" --cf-account YOUR_ACCOUNT_ID</code></pre>
+<p><b>Windows (native PowerShell — no WSL):</b></p>
+<pre><code>powershell -ExecutionPolicy Bypass -File kgpanel-cloudflare.ps1 `
+  -Domain panel.example.com -CfToken $env:CF_TOKEN -CfAccount YOUR_ACCOUNT_ID</code></pre>
+<p class="muted">Optional: <code>--access you@email.com</code> gates the panel behind a Cloudflare login (repeat for several emails); <code>--dry-run</code> checks without changing anything.</p>
+<p>It verifies the token → finds your zone → creates/reuses a tunnel → adds the DNS CNAME (proxied) → programmes the tunnel to <code>your.domain → your panel</code> → installs cloudflared (Docker container, systemd service, or Windows Scheduled Task) → verifies <code>https://your.domain</code> answers.</p>
+<p>You'll then hit Cloudflare's gate before the panel loads (this is the Access screen):</p>
+<img src="img/guide-access-gate.png" style="width:100%;border:1px solid var(--border);border-radius:8px" alt="Cloudflare Access email gate"/>
+
+<h3>No scripts — dashboard only (any OS)</h3>
+<ol class="step">
+<li>Cloudflare dashboard → <b>Zero Trust → Networks → Tunnels → Create a tunnel</b> (cloudflared type). Copy the token it shows.</li>
+<li>In <b>Public Hostname</b>: <code>panel.example.com → HTTP → localhost:8080</code>.</li>
+<li>Run the install one-liner the wizard gives for your OS (they include a Windows Service option) — it connects outbound, no router config.</li>
+<li>Confirm the DNS record shows <b>Proxy status: Proxied</b> (that's the free SSL).</li>
+<li>Optional lock-down: <b>Zero Trust → Access → Applications</b> → your panel domain → policy <i>Allow: your email</i>.</li>
+</ol>
+
+<div class="note">The tunnel only exposes the <b>panel</b> — wings and game ports stay on your private network (or your own forwarded ports). HTTPS is handled by Cloudflare, automatically renewed, on every OS.</div>
+
+<a id="s12"></a><h2><span class="n">12</span>Verify + if something's off</h2>
+<pre><code>curl -sI https://panel.example.com | head -3</code></pre>
+<p>Expect <code>200</code> (or a <code>302/307</code> to the login redirect). <code>401/403</code> means the Access gate is on — expected. The panel also <b>self-updates</b>: tag <code>v1.2.3</code> on a release → Actions builds all platform binaries + checksums → every installed panel/wings updates itself from <b>admin → updates</b>.</p>
+<img src="img/guide-updates.png" style="width:100%;border:1px solid var(--border);border-radius:8px" alt="admin updates/self-update"/>
+
+<table>
+<tr><th>Symptom</th><th>Fix</th></tr>
+<tr><td>Panel: <code>secret is required</code></td><td>pass <code>--secret</code> or set <code>KGPANEL_SECRET</code></td></tr>
+<tr><td>Status <code>unreachable</code></td><td>panel can't reach <code>wings:8081</code> — check firewall</td></tr>
+<tr><td>Status <code>missing</code></td><td>container not created yet — tap <b>start</b> so wings builds it</td></tr>
+<tr><td>Sign-in page gone / login rejected</td><td>an admin already exists — use those credentials</td></tr>
+<tr><td>Graphs empty / badge unreachable</td><td>restart the panel container once after a wings redeploy</td></tr>
+</table>
+
+<p class="muted" style="margin-top:28px">Full reference: <code>docs/INSTALL.md</code> · KGPanel · MIT licensed.</p>
+
+</div></body></html>

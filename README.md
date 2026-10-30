@@ -23,7 +23,10 @@ from source (`make build`).
 
 ## Install
 
-**Step-by-step guide (like your favorite panel's docs): [`docs/INSTALL.md`](docs/INSTALL.md)**
+**Visual step-by-step walkthrough with screenshots: [`docs/GUIDE.html`](docs/GUIDE.html)**
+(open it in any browser — it walks install → first run → add a game → domain + SSL on any OS)
+
+**Full reference: [`docs/INSTALL.md`](docs/INSTALL.md)**
 
 Covers: requirements → download → panel install (binary + systemd, or Docker
 Compose) → first-run admin setup → wings install (Linux + Windows) → adding
