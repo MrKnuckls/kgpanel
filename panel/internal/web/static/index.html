@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KGPanel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/kg.css">
+</head>
+<body>
+<header class="topbar">
+  <img class="brand" src="/img/knuckls-brass-K.png" alt="KGS">
+  <div class="title">KGPanel <span class="ver">v1</span></div>
+  <div class="spacer"></div>
+  <span class="user" id="whoami"></span>
+  <button class="btn small" id="logout">log out</button>
+</header>
+
+<div class="wrap">
+  <div class="row" style="margin-bottom:18px">
+    <h2 style="flex:1">Servers</h2>
+    <button class="btn primary" id="newServer">+ new server</button>
+    <button class="btn" id="adminBtn">admin</button>
+  </div>
+  <div id="serverGrid" class="grid"></div>
+  <div id="empty" class="card muted" style="display:none;text-align:center;padding:40px">
+    No servers yet — deploy your first one.
+  </div>
+</div>
+
+<!-- server detail modal -->
+<div id="detail" class="modal" style="display:none">
+  <div class="modal-card card">
+    <div class="row" style="margin-bottom:12px">
+      <h2 id="dName" style="flex:1"></h2>
+      <span id="dBadge" class="badge"><span class="dot"></span><span id="dState">—</span></span>
+    </div>
+    <div class="power-row">
+      <button class="btn small" data-power="start">start</button>
+      <button class="btn small" data-power="restart">restart</button>
+      <button class="btn small" data-power="stop">stop</button>
+      <button class="btn small danger" data-power="kill">kill</button>
+      <span class="spark" id="dMeta"></span>
+    </div>
+    <div id="console" class="mono">connecting…</div>
+    <div class="row" style="margin-top:10px">
+      <input id="cmd" placeholder="type a console command" style="flex:1" autocomplete="off">
+      <button class="btn" id="sendCmd">send</button>
+    </div>
+  </div>
+</div>
+
+<!-- create server modal -->
+<div id="create" class="modal" style="display:none">
+  <div class="modal-card card">
+    <h2 style="margin-bottom:14px">new server</h2>
+    <form id="createForm">
+      <label>name <input id="cName" required></label>
+      <label>egg (game template)
+        <select id="cEgg" required></select>
+      </label>
+      <label>node
+        <select id="cNode" required></select>
+      </label>
+      <label>memory (MB) <input id="cMem" type="number" min="128" value="1024" required></label>
+      <label>cpu % <input id="cCpu" type="number" min="0" max="400" value="100"></label>
+      <label>ports (comma separated) <input id="cPorts" placeholder="25565/tcp" value="25565/tcp"></label>
+      <div class="row">
+        <button class="btn primary" type="submit">create</button>
+        <button class="btn" type="button" id="cCancel">cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- admin modal -->
+<div id="admin" class="modal" style="display:none">
+  <div class="modal-card card">
+    <h2 style="margin-bottom:14px">admin</h2>
+    <ul class="tabs">
+      <li data-tab="nodes" class="active">nodes</li>
+      <li data-tab="eggs">eggs</li>
+      <li data-tab="audit">audit</li>
+    </ul>
+    <div id="tab-nodes" class="tab">
+      <form id="nodeForm" class="row" style="margin-bottom:12px">
+        <input id="nName" placeholder="name" style="flex:1">
+        <input id="nUrl" placeholder="http://host:8081" style="flex:2">
+        <input id="nToken" placeholder="wings token" style="flex:2">
+        <button class="btn primary" type="submit">add</button>
+      </form>
+      <table id="nodeTable"><thead><tr><th>name</th><th>url</th><th>online</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div id="tab-eggs" class="tab" style="display:none">
+      <form id="eggForm" style="margin-bottom:12px">
+        <label>name <input id="eName" required></label>
+        <label>docker image <input id="eImage" placeholder="ghcr.io/parkervcp/yolks:java_17" required></label>
+        <label>startup <input id="eStartup" placeholder="java -Xmx{{MEM}}M -jar {{JAR}}" required></label>
+        <label>stop command <input id="eStop" value="stop"></label>
+        <label>ports (comma separated) <input id="ePorts" value="25565/tcp"></label>
+        <label>variables ({{VAR}} names, comma separated) <input id="eVars" placeholder="MEM,JAR"></label>
+        <button class="btn primary" type="submit">add egg</button>
+      </form>
+      <table id="eggTable"><thead><tr><th>name</th><th>image</th><th>startup</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div id="tab-audit" class="tab" style="display:none">
+      <table id="auditTable"><thead><tr><th>time</th><th>actor</th><th>action</th><th>target</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>

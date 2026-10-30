@@ -1,0 +1,17 @@
+# ---- build stage ----
+FROM golang:1.24-alpine AS build
+WORKDIR /src
+COPY wings/go.mod wings/go.sum* ./
+RUN go mod download || true
+COPY wings/ ./
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/wings ./cmd/wings
+
+# ---- runtime ----
+# wings needs the docker CLI to drive the host daemon via the mounted socket
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates docker-cli
+WORKDIR /app
+COPY --from=build /out/wings /app/wings
+EXPOSE 8081
+VOLUME ["/data"]
+ENTRYPOINT ["/app/wings"]

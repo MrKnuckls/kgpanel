@@ -1,0 +1,68 @@
+# KGPanel v1
+
+Self-hosted game server management — **panel + wings** — written from scratch in Go.
+A clean-room re-implementation of the panel/daemon architecture (Pelican/Pterodactyl class),
+**not a fork**: no AGPL code is copied (wings-style daemon design is MIT-compatible; ours is
+original code under MIT).
+
+Runs on **Docker** and **bare Linux**. One static binary per component.
+
+```
+┌─────────────┐   HTTP/WS    ┌─────────────┐   Docker API   ┌──────────────┐
+│   PANEL     │ ───────────► │    WINGS    │ ─────────────► │  game server │
+│  web UI +   │              │  node agent │   (container   │  containers  │
+│  API + auth │ ◄─────────── │  power/fs/  │    lifecycle)  │  (isolated)  │
+└─────────────┘              │  console    │                └──────────────┘
+```
+
+## Quick start (Docker)
+
+```bash
+docker compose up -d          # panel on :8080, wings on :8081
+```
+
+First run: open the panel, complete the one-time **setup** page (creates the admin
+account), then register your node (wings address + its token).
+
+## Quick start (bare Linux)
+
+```bash
+# panel
+./kgpanel --listen :8080 --data /var/lib/kgpanel --secret <random>
+
+# wings (on each game node)
+./wings --listen :8081 --token <shared-secret> --data /var/lib/wings
+```
+
+## What v1 does
+
+- **Panel** — user auth (bcrypt + HMAC-signed tokens), server CRUD, node management,
+  egg (server template) management, power control, live console streaming, audit log.
+- **Wings** — runs on each game node, talks to Docker (via the CLI, no daemon-in-daemon),
+  starts/stops/restarts/kills containers, streams container logs, reports real state.
+- **Eggs** — declarative JSON server templates (image, startup command, stop command,
+  variables, ports). Drop one in and you can deploy that game.
+- **Status is evidence-based** — panel asks wings for the container's real state; it
+  never trusts a regex against empty stdout. A live server never shows OFFLINE.
+- **Branding** — knuckls palette + logo, GitHub-dark look (see `panel/web/`).
+
+## Layout
+
+```
+panel/     Go web panel (API + embedded UI)        → kgpanel binary
+wings/     Go node agent (Docker lifecycle)         → wings binary
+eggs/      JSON server templates (one per game)
+deploy/    Dockerfiles (multi-stage)
+docs/      architecture & API notes
+```
+
+## Roadmap (post-v1)
+
+- File manager (SFTP-style, like wings' `/api/client/servers/{id}/files`)
+- Backups (compress + rotate), install scripts per egg, scheduler
+- Postgres/SQLite backend behind the storage interface (v1 uses JSON files)
+- Multi-node dashboard with per-node resource graphs (sparklines)
+
+## License
+
+MIT — original code. Not derived from Pelican or Pterodactyl.

@@ -1,0 +1,126 @@
+package api
+
+import (
+	"encoding/json"
+	"log"
+	"net/http"
+	"time"
+
+	nhooyr "golang.org/x/net/websocket"
+
+	"kgpanel/panel/internal/auth"
+	"kgpanel/panel/internal/wingsclient"
+)
+
+func decodeJSON(r *http.Request, dst interface{}) error {
+	return json.NewDecoder(r.Body).Decode(dst)
+}
+
+// Handler builds the full mux: API under /api, embedded UI under /, with
+// auth middleware on everything under /api except setup + login.
+func (s *Server) Handler(ui http.Handler) http.Handler {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/api/setup", s.handleSetup)
+	mux.HandleFunc("/api/login", s.handleLogin)
+
+	// protected API
+	mux.Handle("/api/me", s.auth(http.HandlerFunc(s.handleMe)))
+	mux.Handle("/api/nodes", s.auth(http.HandlerFunc(s.handleNodes)))
+	mux.Handle("/api/nodes/create", s.auth(http.HandlerFunc(s.handleCreateNode)))
+	mux.Handle("/api/eggs", s.auth(http.HandlerFunc(s.handleEggs)))
+	mux.Handle("/api/eggs/create", s.auth(http.HandlerFunc(s.handleCreateEgg)))
+	mux.Handle("/api/servers", s.auth(http.HandlerFunc(s.handleServers)))
+	mux.Handle("/api/servers/create", s.auth(http.HandlerFunc(s.handleCreateServer)))
+	mux.Handle("/api/servers/{id}/power", s.auth(http.HandlerFunc(s.handlePower)))
+	mux.Handle("/api/servers/{id}/status", s.auth(http.HandlerFunc(s.handleStatus)))
+	mux.Handle("/api/audit", s.auth(http.HandlerFunc(s.handleAudit)))
+
+	// websocket console proxy: browser -> panel -> wings
+	mux.Handle("/api/console/{id}", s.auth(nhooyr.Handler(s.handleConsoleProxy)))
+
+	mux.Handle("/", ui)
+	return logRequests(mux)
+}
+
+// auth middleware verifies the bearer token and stamps the user id header
+// that handlers read via userFromRequest.
+func (s *Server) auth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tok := auth.Bearer(r)
+		if tok == "" && r.Method == http.MethodGet {
+			// allow ?token= for websocket handshakes that cannot set headers
+			tok = r.URL.Query().Get("token")
+		}
+		uid, err := auth.Verify(s.secret, tok)
+		if err != nil {
+			writeErr(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		r.Header.Set("X-KG-User", uid)
+		next.ServeHTTP(w, r)
+	})
+}
+
+func logRequests(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		next.ServeHTTP(w, r)
+		log.Printf("%s %s %s", r.Method, r.URL.Path, time.Since(start).Round(time.Millisecond))
+	})
+}
+
+// handleConsoleProxy: browser opens a ws to /api/console/<id>?token=..., we
+// open the matching wings console ws and bridge frames both ways.
+func (s *Server) handleConsoleProxy(ws *nhooyr.Conn) {
+	uid := ws.Request().Header.Get("X-KG-User")
+	if uid == "" {
+		_ = ws.Close()
+		return
+	}
+	serverID := ws.Request().PathValue("id")
+	sv := s.st.GetServer(serverID)
+	if sv == nil {
+		_ = ws.Close()
+		return
+	}
+	n := s.st.GetNode(sv.NodeID)
+	if n == nil {
+		_ = ws.Close()
+		return
+	}
+	// Connect to wings with the node token via query param (wings reads header
+	// or query; our proxy passes the node token, never the user token).
+	client := wingsclient.New()
+	up, err := nhooyr.Dial(client.ConsoleURL(n, serverID)+"?token="+n.Token, "", client.ConsoleURL(n, serverID))
+	if err != nil {
+		_ = ws.Close()
+		return
+	}
+	defer up.Close()
+	go func() {
+		// wings -> browser
+		buf := make([]byte, 8192)
+		for {
+			m, err := up.Read(buf)
+			if err != nil {
+				_ = ws.Close()
+				return
+			}
+			if _, err := ws.Write(buf[:m]); err != nil {
+				return
+			}
+		}
+	}()
+	// browser -> wings
+	buf := make([]byte, 8192)
+	for {
+		m, err := ws.Read(buf)
+		if err != nil {
+			return
+		}
+		if _, err := up.Write(buf[:m]); err != nil {
+			return
+		}
+	}
+}

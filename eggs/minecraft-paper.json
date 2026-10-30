@@ -1,0 +1,9 @@
+{
+  "name": "Minecraft (Paper)",
+  "description": "Paper server — Spigot-compatible, latest stable",
+  "image": "ghcr.io/parkervcp/yolks:java_17",
+  "startup": "java -Xmx{{MEM}}M -jar {{JAR}}",
+  "stop_command": "stop",
+  "variables": ["MEM", "JAR"],
+  "ports": ["25565/tcp"]
+}

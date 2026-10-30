@@ -1,0 +1,9 @@
+{
+  "name": "Generic Python",
+  "description": "Python 3.12 app server (test egg)",
+  "image": "python:3.12-slim",
+  "startup": "python main.py",
+  "stop_command": "",
+  "variables": [],
+  "ports": ["8000/tcp"]
+}

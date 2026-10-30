@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KGPanel — sign in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/kg.css">
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="logo"><img src="/img/knuckls-brass-K.png" alt="KGS"></div>
+    <h1>KGPanel</h1>
+    <div class="sub">self-hosted game server control — v1</div>
+    <div id="err" class="err"></div>
+    <form id="loginForm">
+      <div>
+        <label for="username">username</label>
+        <input id="username" autocomplete="username" required>
+      </div>
+      <div>
+        <label for="password">password</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+      </div>
+      <button class="btn primary" type="submit">sign in</button>
+    </form>
+    <div id="setupNote" class="muted" style="display:none;text-align:center;font-size:12px">
+      No accounts yet — sign in with any username/password to create the admin.
+    </div>
+  </div>
+</div>
+<script>
+const API = "/api";
+let state = localStorage.getItem("kg_token");
+
+async function check() {
+  if (!state) return;
+  try {
+    const r = await fetch(API + "/me", { headers: { Authorization: "Bearer " + state } });
+    if (r.ok) { location.href = "/"; return; }
+    localStorage.removeItem("kg_token"); state = null;
+  } catch (e) {}
+}
+check();
+
+// First-run: if GET /api/me 401s AND no user exists, the panel lets you bootstrap.
+document.getElementById("loginForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value;
+  const err = document.getElementById("err");
+  err.textContent = "";
+  // try login; if the panel has zero users it accepts this as setup
+  const r = await fetch(API + "/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (r.status === 401) {
+    err.textContent = "invalid credentials";
+    return;
+  }
+  if (r.status === 409) {
+    document.getElementById("setupNote").style.display = "block";
+    err.textContent = "setup already completed — try the real credentials";
+    return;
+  }
+  const d = await r.json();
+  if (d.token) {
+    localStorage.setItem("kg_token", d.token);
+    location.href = "/";
+  } else {
+    err.textContent = d.error || "unexpected response";
+  }
+});
+</script>
+</body>
+</html>
