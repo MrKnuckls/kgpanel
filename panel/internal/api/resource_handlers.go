@@ -105,6 +105,7 @@ func (s *Server) handleCreateServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.OwnerID = userFromRequest(r)
+	in.Ports = normalizePorts(in.Ports)
 	if err := s.st.CreateServer(&in); err != nil {
 		writeErr(w, http.StatusInternalServerError, "store failed")
 		return
@@ -143,6 +144,26 @@ func (s *Server) pushServerConfig(sv *store.Server, recreate bool) {
 	}
 }
 
+// normalizePorts turns bare "8211/udp" entries into the explicit
+// "8211:8211/udp" host-map form docker expects. A bare "8211/udp" would make
+// docker publish a RANDOM host port (e.g. 32819), which breaks the fixed
+// connect address. Strings already containing ":" are left alone.
+func normalizePorts(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, p := range in {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if !strings.Contains(p, ":") {
+			out = append(out, p+":"+p)
+		} else {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // handleServerSettings updates a server's own settings (memory, cpu, ports, env)
 // and pushes the new spec to wings with recreate so the running container picks
 // up port/limit changes.
@@ -166,7 +187,7 @@ func (s *Server) handleServerSettings(w http.ResponseWriter, r *http.Request) {
 			sv.CPUPercent = in.CPUPercent
 		}
 		if in.Ports != nil {
-			sv.Ports = in.Ports
+			sv.Ports = normalizePorts(in.Ports)
 		}
 		if in.Env != nil {
 			sv.Env = in.Env
