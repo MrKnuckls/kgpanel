@@ -200,8 +200,9 @@ type Sample struct {
 	MemLimitMB float64 `json:"mem_limit_mb"`
 	NetRXBps   float64 `json:"net_rx_bps"`
 	NetTXBps   float64 `json:"net_tx_bps"`
-	DiskBytes  uint64  `json:"disk_bytes"`
-	At         int64   `json:"at"`
+	DiskBytes      uint64 `json:"disk_bytes"`
+	DiskTotalBytes uint64 `json:"disk_total_bytes"`
+	At             int64  `json:"at"`
 }
 
 // Metrics returns the rolling resource history wings keeps for a server.
