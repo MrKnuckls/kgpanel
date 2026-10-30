@@ -24,10 +24,13 @@ func main() {
 	}
 	log.Printf("KG Wings %s listening on %s (data: %s)", version.Version, cfg.Listen, cfg.Data)
 
-	// background resource sampler (CPU/mem/net/disk history per server)
+	// background resource sampler (CPU/mem/net/disk history per server).
+	// cfg.Data is the container-visible data dir (/data) — du for disk usage
+	// runs inside this container, so the host path (cfg.HostData) would not
+	// resolve here.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	reg := metrics.NewRegistry(ctx, cfg.HostData)
+	reg := metrics.NewRegistry(ctx, cfg.Data)
 	defer reg.Stop()
 
 	sig := make(chan os.Signal, 1)

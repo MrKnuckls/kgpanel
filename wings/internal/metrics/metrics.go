@@ -4,7 +4,6 @@ package metrics
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -127,30 +126,25 @@ func (r *Registry) runningServers(ctx context.Context) []string {
 	return ids
 }
 
-// dockerStatsJSON is the subset of `docker stats --no-stream --format json` we read.
-type dockerStatsJSON struct {
-	CPUPerc  string `json:"cpu_percentage"`
-	MemUsage string `json:"mem_usage"` // "1.234GiB / 8GiB"
-	NetIO    string `json:"net_io"`    // "12.3MB / 45.6MB"
-	PuID     string `json:"pids"`
-}
-
 // sampleDocker reads docker stats for one container and computes rates.
 func (r *Registry) sampleDocker(ctx context.Context, serverID string, prevRx, prevTx uint64, prevTime, nowTs int64) (Sample, uint64, uint64, bool) {
 	name := "kg-" + serverID
-	cmd := exec.CommandContext(ctx, "docker", "stats", "--no-stream", "--format", "{{json .}}", name)
+	// "|"-delimited to avoid Go field-name guessing on {{json .}} (which emits
+	// CPUPerc/MemUsage/NetIO, not snake_case). Fields: cpu|mem|net.
+	cmd := exec.CommandContext(ctx, "docker", "stats", "--no-stream", "--format", "{{.CPUPerc}}|{{.MemUsage}}|{{.NetIO}}", name)
 	out, err := cmd.Output()
 	if err != nil {
 		return Sample{}, 0, 0, false
 	}
-	var st dockerStatsJSON
-	if err := json.Unmarshal(out, &st); err != nil {
+	parts := strings.Split(strings.TrimSpace(string(out)), "|")
+	if len(parts) < 3 {
 		return Sample{}, 0, 0, false
 	}
-	s := Sample{MemLimitMB: memLimit(st.MemUsage), At: nowTs}
-	s.CPUPercent = parseFirstNum(st.CPUPerc)
-	s.MemUsedMB = memUsed(st.MemUsage)
-	rx, tx := parseNetIO(st.NetIO)
+	cpuStr, memStr, netStr := parts[0], parts[1], parts[2]
+	s := Sample{MemLimitMB: memLimit(memStr), At: nowTs}
+	s.CPUPercent = parseFirstNum(cpuStr)
+	s.MemUsedMB = memUsed(memStr)
+	rx, tx := parseNetIO(netStr)
 	dt := float64(nowTs - prevTime)
 	if prevTime > 0 && dt > 0 {
 		s.NetRXBps = float64(rx-prevRx) / dt
