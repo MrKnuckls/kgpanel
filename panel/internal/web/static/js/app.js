@@ -10,7 +10,14 @@ let currentServer = null;
 let ws = null;
 let cron = null;
 let currentPath = "/";
+// whoami: {username, admin, subuser, servers:[{id,permission}...]}; myPerm is
+// the caller's permission on the currently open server ("admin" for owners).
+let me = null;
+let myPerm = "admin";
 const $ = (id) => document.getElementById(id);
+
+const PERM_RANK = { view: 1, control: 2, admin: 3 };
+function hasPerm(min) { return (PERM_RANK[myPerm] || 0) >= (PERM_RANK[min] || 0); }
 
 /* ---------- helpers ---------- */
 function authHeaders(extra) {
@@ -41,9 +48,35 @@ function showDash() { $("viewDash").style.display = "block"; $("viewDetail").sty
 function showDetail(id) {
   currentServer = id; $("viewDash").style.display = "none"; $("viewDetail").style.display = "block";
   document.querySelectorAll(".side-item").forEach((x) => x.classList.toggle("active", x.dataset.id === id));
+  // resolve this caller's permission on this server and gate the UI
+  myPerm = "admin";
+  if (me && me.subuser) {
+    const hit = (me.servers || []).find((s) => s.id === id);
+    myPerm = (hit && hit.permission) || "none";
+  }
+  applyPermUI();
   $("dName").textContent = id; refreshStatus(); connectConsole(); loadFiles(); loadSchedules(); loadBackups(); loadDatabases();
   loadNetwork(); loadStartup(); loadUsers(); loadActivity();
   startMetrics();
+}
+
+// show/hide power buttons + tabs according to myPerm (view < control < admin)
+function applyPermUI() {
+  const canControl = hasPerm("control");
+  const canAdmin = hasPerm("admin");
+  document.querySelectorAll("[data-power]").forEach((b) => (b.style.display = canControl ? "" : "none"));
+  const showTab = (name, on) => {
+    const b = document.querySelector('.dtab[data-tab="' + name + '"]');
+    if (b) b.style.display = on ? "" : "none";
+  };
+  showTab("users", canAdmin);
+  showTab("settings", canAdmin);
+  showTab("databases", canControl);
+  showTab("schedules", canControl);
+  showTab("backups", canControl);
+  // hide the console command bar for view-only users
+  const ti = document.querySelector(".term-input");
+  if (ti) ti.style.display = canControl ? "" : "none";
 }
 $("backBtn").addEventListener("click", showDash);
 
@@ -105,8 +138,12 @@ async function loadMetrics() {
 /* ---------- topbar (whoami) ---------- */
 async function refresh() {
   try {
-    const me = await jfetch("/me");
+    me = await jfetch("/me");
     $("whoami").textContent = me.username + (me.admin ? " · admin" : "");
+    const isSub = !!me.subuser;
+    // subusers don't manage nodes/eggs/updates or create servers
+    $("adminBtn").style.display = isSub ? "none" : "";
+    $("newServer").style.display = isSub ? "none" : "";
   } catch (e) {}
   try {
     const d = await jfetch("/servers");

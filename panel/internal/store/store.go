@@ -48,10 +48,11 @@ type Egg struct {
 }
 
 type SubUser struct {
-	ID         string    `json:"id"`
-	Username   string    `json:"username"`
-	Permission string    `json:"permission"` // view | control | admin
-	CreatedAt  time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	Username     string    `json:"username"`
+	Permission   string    `json:"permission"` // view | control | admin
+	PasswordHash string    `json:"password_hash,omitempty"` // bcrypt; never re-serialized to the UI
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type Server struct {
@@ -331,6 +332,51 @@ func (s *Store) RemoveSubUser(serverID, subID string) error {
 		}
 	}
 	return fmt.Errorf("no such user")
+}
+
+// SubUserPerm returns the subuser's permission on a server ("" if none).
+// Panel owners always have "admin" implicitly — callers check that first.
+func (s *Store) SubUserPerm(serverID, username string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sv, ok := s.servers[serverID]
+	if !ok {
+		return ""
+	}
+	for _, x := range sv.SubUsers {
+		if x.Username == username {
+			return x.Permission
+		}
+	}
+	return ""
+}
+
+// FindSubUser returns the subuser record for a username on any server: for login
+// (a subuser logs in with their own username) as (serverID, user, found).
+func (s *Store) FindSubUser(username string) (string, SubUser, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, sv := range s.servers {
+		for _, x := range sv.SubUsers {
+			if x.Username == username {
+				return sv.ID, x, true
+			}
+		}
+	}
+	return "", SubUser{}, false
+}
+
+// ListSubUsersFor returns durable copies of a server's subusers.
+func (s *Store) ListSubUsersFor(serverID string) []SubUser {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sv, ok := s.servers[serverID]
+	if !ok {
+		return nil
+	}
+	out := make([]SubUser, len(sv.SubUsers))
+	copy(out, sv.SubUsers)
+	return out
 }
 
 // AuditForServer returns the most recent audit entries targeting this server.

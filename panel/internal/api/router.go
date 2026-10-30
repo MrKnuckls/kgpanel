@@ -35,27 +35,27 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.Handle("/api/eggs/update", s.auth(http.HandlerFunc(s.handleUpdateEgg)))
 	mux.Handle("/api/servers", s.auth(http.HandlerFunc(s.handleServers)))
 	mux.Handle("/api/servers/create", s.auth(http.HandlerFunc(s.handleCreateServer)))
-	mux.Handle("/api/servers/{id}/power", s.auth(http.HandlerFunc(s.handlePower)))
-	mux.Handle("/api/servers/{id}/settings", s.auth(http.HandlerFunc(s.handleServerSettings)))
-	mux.Handle("/api/servers/{id}/status", s.auth(http.HandlerFunc(s.handleStatus)))
-	mux.Handle("/api/servers/{id}/metrics", s.auth(http.HandlerFunc(s.handleMetrics)))
-	mux.Handle("/api/servers/{id}/files", s.auth(http.HandlerFunc(s.handleFilesList)))
-	mux.Handle("/api/servers/{id}/files/upload", s.auth(http.HandlerFunc(s.handleFilesUpload)))
-	mux.Handle("/api/servers/{id}/files/mkdir", s.auth(http.HandlerFunc(s.handleFilesMkdir)))
-	mux.Handle("/api/servers/{id}/files/delete", s.auth(http.HandlerFunc(s.handleFilesDelete)))
-	mux.Handle("/api/servers/{id}/files/download", s.auth(http.HandlerFunc(s.handleFilesDownload)))
-	mux.Handle("/api/servers/{id}/backups", s.auth(http.HandlerFunc(s.handleBackupsList)))
-	mux.Handle("/api/servers/{id}/backups/create", s.auth(http.HandlerFunc(s.handleBackupsCreate)))
-	mux.Handle("/api/servers/{id}/backups/delete", s.auth(http.HandlerFunc(s.handleBackupsDelete)))
-	mux.Handle("/api/servers/{id}/backups/restore", s.auth(http.HandlerFunc(s.handleBackupsRestore)))
-	mux.Handle("/api/servers/{id}/backups/download", s.auth(http.HandlerFunc(s.handleBackupsDownload)))
-	mux.Handle("/api/servers/{id}/schedules", s.auth(http.HandlerFunc(s.handleSchedulesList)))
-	mux.Handle("/api/servers/{id}/schedules/create", s.auth(http.HandlerFunc(s.handleSchedulesCreate)))
-	mux.Handle("/api/servers/{id}/schedules/{sid}/delete", s.auth(http.HandlerFunc(s.handleSchedulesDelete)))
-	mux.Handle("/api/servers/{id}/activity", s.auth(http.HandlerFunc(s.handleServerActivity)))
-	mux.Handle("/api/servers/{id}/users", s.auth(http.HandlerFunc(s.handleSubUsers)))
-	mux.Handle("/api/servers/{id}/users/create", s.auth(http.HandlerFunc(s.handleSubUserCreate)))
-	mux.Handle("/api/servers/{id}/users/{sid}/delete", s.auth(http.HandlerFunc(s.handleSubUserDelete)))
+	mux.Handle("/api/servers/{id}/power", s.auth(s.perm("control", http.HandlerFunc(s.handlePower))))
+	mux.Handle("/api/servers/{id}/settings", s.auth(s.perm("admin", http.HandlerFunc(s.handleServerSettings))))
+	mux.Handle("/api/servers/{id}/status", s.auth(s.perm("view", http.HandlerFunc(s.handleStatus))))
+	mux.Handle("/api/servers/{id}/metrics", s.auth(s.perm("view", http.HandlerFunc(s.handleMetrics))))
+	mux.Handle("/api/servers/{id}/files", s.auth(s.perm("view", http.HandlerFunc(s.handleFilesList))))
+	mux.Handle("/api/servers/{id}/files/upload", s.auth(s.perm("control", http.HandlerFunc(s.handleFilesUpload))))
+	mux.Handle("/api/servers/{id}/files/mkdir", s.auth(s.perm("control", http.HandlerFunc(s.handleFilesMkdir))))
+	mux.Handle("/api/servers/{id}/files/delete", s.auth(s.perm("control", http.HandlerFunc(s.handleFilesDelete))))
+	mux.Handle("/api/servers/{id}/files/download", s.auth(s.perm("view", http.HandlerFunc(s.handleFilesDownload))))
+	mux.Handle("/api/servers/{id}/backups", s.auth(s.perm("view", http.HandlerFunc(s.handleBackupsList))))
+	mux.Handle("/api/servers/{id}/backups/create", s.auth(s.perm("control", http.HandlerFunc(s.handleBackupsCreate))))
+	mux.Handle("/api/servers/{id}/backups/delete", s.auth(s.perm("control", http.HandlerFunc(s.handleBackupsDelete))))
+	mux.Handle("/api/servers/{id}/backups/restore", s.auth(s.perm("control", http.HandlerFunc(s.handleBackupsRestore))))
+	mux.Handle("/api/servers/{id}/backups/download", s.auth(s.perm("view", http.HandlerFunc(s.handleBackupsDownload))))
+	mux.Handle("/api/servers/{id}/schedules", s.auth(s.perm("view", http.HandlerFunc(s.handleSchedulesList))))
+	mux.Handle("/api/servers/{id}/schedules/create", s.auth(s.perm("control", http.HandlerFunc(s.handleSchedulesCreate))))
+	mux.Handle("/api/servers/{id}/schedules/{sid}/delete", s.auth(s.perm("control", http.HandlerFunc(s.handleSchedulesDelete))))
+	mux.Handle("/api/servers/{id}/activity", s.auth(s.perm("view", http.HandlerFunc(s.handleServerActivity))))
+	mux.Handle("/api/servers/{id}/users", s.auth(s.perm("admin", http.HandlerFunc(s.handleSubUsers))))
+	mux.Handle("/api/servers/{id}/users/create", s.auth(s.perm("admin", http.HandlerFunc(s.handleSubUserCreate))))
+	mux.Handle("/api/servers/{id}/users/{sid}/delete", s.auth(s.perm("admin", http.HandlerFunc(s.handleSubUserDelete))))
 	mux.Handle("/api/audit", s.auth(http.HandlerFunc(s.handleAudit)))
 	mux.Handle("/api/update/check", s.auth(http.HandlerFunc(s.handleUpdateCheck)))
 	mux.Handle("/api/update", s.auth(http.HandlerFunc(s.handleUpdate)))
@@ -125,6 +125,17 @@ func (s *Server) auth(next http.Handler) http.Handler {
 	})
 }
 
+// perm wraps a handler with a minimum permission check on the server in the
+// URL path ({id}). Panel owners pass as admin; subusers need their stored perm.
+func (s *Server) perm(min string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.requirePerm(w, r, min) {
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func logRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -144,6 +155,10 @@ func (s *Server) handleConsoleProxy(ws *nhooyr.Conn) {
 	serverID := ws.Request().PathValue("id")
 	sv := s.st.GetServer(serverID)
 	if sv == nil {
+		_ = ws.Close()
+		return
+	}
+	if permRank(s.actorPerm(ws.Request(), serverID)) < permRank("view") {
 		_ = ws.Close()
 		return
 	}

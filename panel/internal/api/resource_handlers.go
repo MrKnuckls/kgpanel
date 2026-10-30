@@ -67,6 +67,7 @@ func (s *Server) handleCreateEgg(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleServers lists servers; join node/egg names for the UI.
+// Subusers only see the servers they have access to.
 func (s *Server) handleServers(w http.ResponseWriter, r *http.Request) {
 	servers := s.st.ListServers()
 	type row struct {
@@ -75,8 +76,17 @@ func (s *Server) handleServers(w http.ResponseWriter, r *http.Request) {
 		NodeURL  string `json:"node_url"`
 		EggName  string `json:"egg_name"`
 	}
+	uid := userFromRequest(r)
+	isSub := strings.HasPrefix(uid, "sub:")
+	uname := ""
+	if isSub {
+		uname = strings.TrimPrefix(uid, "sub:")
+	}
 	rows := make([]row, 0, len(servers))
 	for _, sv := range servers {
+		if isSub && s.st.SubUserPerm(sv.ID, uname) == "" {
+			continue
+		}
 		rw := row{Server: sv}
 		if n := s.st.GetNode(sv.NodeID); n != nil {
 			rw.NodeName = n.Name

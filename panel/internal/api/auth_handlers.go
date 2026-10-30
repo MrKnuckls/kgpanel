@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"kgpanel/panel/internal/auth"
@@ -34,6 +35,42 @@ func (s *Server) SetUpdateURL(u string) {
 // it via the middleware-set header to keep things dependency-free.
 func userFromRequest(r *http.Request) string {
 	return r.Header.Get("X-KG-User")
+}
+
+// permRank maps a permission label to a comparable rank.
+func permRank(p string) int {
+	switch p {
+	case "admin":
+		return 3
+	case "control":
+		return 2
+	case "view":
+		return 1
+	}
+	return 0
+}
+
+// actorPerm returns the caller's permission on a server: panel users (subjects
+// without the "sub:" prefix) are implicitly admin; subusers get their stored
+// permission for that server, or "" if they're not on it.
+func (s *Server) actorPerm(r *http.Request, serverID string) string {
+	uid := userFromRequest(r)
+	if !strings.HasPrefix(uid, "sub:") {
+		return "admin"
+	}
+	return s.st.SubUserPerm(serverID, strings.TrimPrefix(uid, "sub:"))
+}
+
+// requirePerm checks the caller has at least min permission on the server in
+// the URL path; on failure it writes 403 and returns false.
+func (s *Server) requirePerm(w http.ResponseWriter, r *http.Request, min string) bool {
+	serverID := r.PathValue("id")
+	got := s.actorPerm(r, serverID)
+	if permRank(got) < permRank(min) {
+		writeErr(w, http.StatusForbidden, "insufficient permission")
+		return false
+	}
+	return true
 }
 
 func writeJSON(w http.ResponseWriter, code int, v interface{}) {
@@ -112,6 +149,16 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var fallbackHash, _ = auth.HashPassword("nope")
 	if u == nil || !auth.CheckPassword(u.PasswordHash, in.Password) {
 		_ = auth.CheckPassword(fallbackHash, in.Password)
+		if u == nil {
+			// a subuser logs in with their own username+password; their token
+			// subject is sub:<username> so permission checks resolve per-server.
+			if _, su, ok := s.st.FindSubUser(in.Username); ok && auth.CheckPassword(su.PasswordHash, in.Password) {
+				s.st.Audit(su.Username, "subuser_login", "", "web login")
+				tok, _ := auth.Sign(s.secret, "sub:"+su.Username)
+				writeJSON(w, http.StatusOK, map[string]string{"token": tok, "username": su.Username, "subuser": "true"})
+				return
+			}
+		}
 		s.st.Audit(in.Username, "login_failed", "panel", "bad credentials")
 		writeErr(w, http.StatusUnauthorized, "invalid credentials")
 		return
@@ -125,6 +172,26 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	uid := userFromRequest(r)
+	if strings.HasPrefix(uid, "sub:") {
+		uname := strings.TrimPrefix(uid, "sub:")
+		// subusers may be on several servers; list them so the UI can show
+		// only what they can reach.
+		type view struct {
+			ID         string `json:"id"`
+			Name       string `json:"name"`
+			Permission string `json:"permission"`
+		}
+		var servers []view
+		for _, sv := range s.st.ListServers() {
+			if p := s.st.SubUserPerm(sv.ID, uname); p != "" {
+				servers = append(servers, view{ID: sv.ID, Name: sv.Name, Permission: p})
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"id": uid, "username": uname, "admin": false, "subuser": true, "servers": servers,
+		})
+		return
+	}
 	u := s.st.GetUser(uid)
 	if u == nil {
 		writeErr(w, http.StatusUnauthorized, "no such user")

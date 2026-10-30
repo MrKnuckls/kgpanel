@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"kgpanel/panel/internal/auth"
 	"kgpanel/panel/internal/store"
 )
 
@@ -25,7 +26,7 @@ func (s *Server) handleServerActivity(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{"activity": s.st.AuditForServer(serverID, n)})
 }
 
-// handleSubUsers lists the server's subusers.
+// handleSubUsers lists the server's subusers (never the password hashes).
 func (s *Server) handleSubUsers(w http.ResponseWriter, r *http.Request) {
 	serverID := r.PathValue("id")
 	sv := s.st.GetServer(serverID)
@@ -33,7 +34,16 @@ func (s *Server) handleSubUsers(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "server not found")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"users": sv.SubUsers})
+	clean := make([]map[string]interface{}, 0, len(sv.SubUsers))
+	for _, u := range sv.SubUsers {
+		clean = append(clean, map[string]interface{}{
+			"id":         u.ID,
+			"username":   u.Username,
+			"permission": u.Permission,
+			"created_at": u.CreatedAt,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"users": clean})
 }
 
 // handleSubUserCreate adds a subuser to a server.
@@ -41,6 +51,7 @@ func (s *Server) handleSubUserCreate(w http.ResponseWriter, r *http.Request) {
 	serverID := r.PathValue("id")
 	var in struct {
 		Username   string `json:"username"`
+		Password   string `json:"password"`
 		Permission string `json:"permission"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
@@ -52,13 +63,22 @@ func (s *Server) handleSubUserCreate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "username required")
 		return
 	}
+	if len(in.Password) < 4 {
+		writeErr(w, http.StatusBadRequest, "password must be at least 4 characters")
+		return
+	}
 	switch in.Permission {
 	case "view", "control", "admin":
 	default:
 		writeErr(w, http.StatusBadRequest, "permission must be view|control|admin")
 		return
 	}
-	su := &store.SubUser{Username: in.Username, Permission: in.Permission}
+	hash, herr := auth.HashPassword(in.Password)
+	if herr != nil {
+		writeErr(w, http.StatusInternalServerError, "password hashing failed")
+		return
+	}
+	su := &store.SubUser{Username: in.Username, Permission: in.Permission, PasswordHash: hash}
 	if err := s.st.AddSubUser(serverID, su); err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
