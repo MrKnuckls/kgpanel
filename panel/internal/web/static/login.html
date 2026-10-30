@@ -106,7 +106,7 @@ document.getElementById("setupForm").addEventListener("submit", async (ev) => {
       body: JSON.stringify({ username: name, password: pass }),
     });
     const d = await r.json();
-    if (d.token) { localStorage.setItem("kg_token", d.token); location.href = "/"; }
+    if (d.token) { localStorage.setItem("kg_token", d.token); document.cookie = "kg_token=" + encodeURIComponent(d.token) + "; path=/"; location.href = "/"; }
     else showErr(d.error || "setup failed");
   } catch (e) { showErr("setup failed — is the panel running?"); }
 });
@@ -124,7 +124,7 @@ document.getElementById("loginForm").addEventListener("submit", async (ev) => {
       body: JSON.stringify({ username, password }),
     });
     const d = await r.json();
-    if (d.token) { localStorage.setItem("kg_token", d.token); location.href = "/"; }
+    if (d.token) { localStorage.setItem("kg_token", d.token); document.cookie = "kg_token=" + encodeURIComponent(d.token) + "; path=/"; location.href = "/"; }
     else showErr(d.error || "invalid credentials");
   } catch (e) { showErr("login failed — is the panel running?"); }
 });

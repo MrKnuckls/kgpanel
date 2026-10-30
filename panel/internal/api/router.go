@@ -90,6 +90,11 @@ func (s *Server) authenticated(r *http.Request) bool {
 	if tok == "" {
 		tok = r.URL.Query().Get("token")
 	}
+	if tok == "" {
+		if c, err := r.Cookie("kg_token"); err == nil {
+			tok = c.Value
+		}
+	}
 	_, err := auth.Verify(s.secret, tok)
 	return err == nil
 }

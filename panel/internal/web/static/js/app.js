@@ -12,7 +12,7 @@ function authHeaders(extra) {
 }
 async function jfetch(url, opts) {
   const r = await fetch(API + url, Object.assign({ headers: authHeaders({ "Content-Type": "application/json" }) }, opts || {}));
-  if (r.status === 401) { localStorage.removeItem("kg_token"); location.href = "/login.html"; }
+  if (r.status === 401) { localStorage.removeItem("kg_token"); document.cookie = "kg_token=; path=/; Max-Age=0"; location.href = "/login.html"; }
   if (!r.ok) { let m = "request failed"; try { m = (await r.json()).error || m; } catch (e) {} throw new Error(m); }
   return r.json();
 }
@@ -297,7 +297,7 @@ $("updApply").addEventListener("click", async () => {
   try { const d = await jfetch("/update", { method: "POST" }); el.textContent = d.message || "done"; }
   catch (e) { el.textContent = "update failed — " + e.message; }
 });
-$("logout").addEventListener("click", () => { localStorage.removeItem("kg_token"); location.href = "/login.html"; });
+$("logout").addEventListener("click", () => { localStorage.removeItem("kg_token"); document.cookie = "kg_token=; path=/; Max-Age=0"; location.href = "/login.html"; });
 ["create", "admin"].forEach((id) => $(id).addEventListener("click", (ev) => { if (ev.target === $(id)) $(id).style.display = "none"; }));
 if (!token) location.href = "/login.html";
 refresh();
