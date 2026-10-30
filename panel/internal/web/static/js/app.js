@@ -73,11 +73,16 @@ async function refresh() {
 }
 
 /* ---------- power / detail ---------- */
+function setBadge(state) {
+  const b = $("dBadge");
+  b.className = "badge " + (["running", "stopped", "starting"].includes(state) ? state : "");
+  $("dState").textContent = state;
+}
 async function refreshStatus() {
   if (!currentServer) return;
   try {
     const d = await jfetch("/servers/" + currentServer + "/status");
-    $("dState").textContent = d.state;
+    setBadge(d.state);
     const dd = await jfetch("/servers");
     const sv = dd.servers.find((x) => x.id === currentServer);
     if (sv) { $("dName").textContent = sv.name; $("dMeta").textContent = `${sv.memory_mb}MB · ${sv.cpu_percent}%`; }
@@ -86,8 +91,8 @@ async function refreshStatus() {
 document.querySelectorAll("[data-power]").forEach((b) => b.addEventListener("click", async () => {
   const signal = b.dataset.power;
   try {
+    setBadge("starting"); // immediate visual feedback while the action runs
     await jfetch("/servers/" + currentServer + "/power", { method: "POST", body: JSON.stringify({ signal }) });
-    $("dState").textContent = "sent " + signal;
     setTimeout(refreshStatus, 1500);
   } catch (e) { alert(e.message); }
 }));

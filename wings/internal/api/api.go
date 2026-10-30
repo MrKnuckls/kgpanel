@@ -71,7 +71,7 @@ func Handler(token, dataDir, hostDataDir, updateURL string) http.Handler {
 				return
 			}
 		}
-		if err := docker.Power(ctx, id, in.Signal, 30); err != nil {
+		if err := docker.Power(ctx, id, in.Signal, 15); err != nil {
 			httpError(w, http.StatusBadGateway, err.Error())
 			return
 		}

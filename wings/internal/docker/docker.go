@@ -63,7 +63,17 @@ func EnsureExists(ctx context.Context, hostDataDir, serverID, image string, env 
 	}
 	args = append(args, image)
 	if startup != "" {
-		args = append(args, "/bin/sh", "-c", startup)
+		// PID-1-in-a-container signal forwarding: Linux ignores signals with
+		// default action when the target is PID 1, so a bare `python main.py`
+		// as PID 1 swallows SIGTERM and docker stop must wait its full timeout
+		// before force-killing (SIGKILL). Keep sh as PID 1 with a TERM trap
+		// that forwards the signal to the server process — a non-PID-1 process
+		// with default disposition dies immediately, so graceful stops are
+		// fast and cooperative servers still get their chance to shut down.
+		// The subshell ensures $! is the real process (dash execs a simple
+		// single-command subshell, so the trap kills the actual server).
+		wrapper := "trap 'kill -TERM $child 2>/dev/null' TERM INT; ( " + startup + " ) & child=$!; wait $child"
+		args = append(args, "/bin/sh", "-c", wrapper)
 	}
 	if _, err := run(ctx, args...); err != nil {
 		return "", err
