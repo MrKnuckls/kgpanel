@@ -34,6 +34,8 @@ type ServerSpec struct {
 	Ports      []string          `json:"ports"`
 	MemoryMB   int               `json:"memory_mb"`
 	CPUPercent int               `json:"cpu_percent"`
+	Network    string            `json:"network,omitempty"`
+	DB         bool              `json:"db,omitempty"`
 	Recreate   bool              `json:"recreate,omitempty"`
 }
 

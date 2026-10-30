@@ -6,7 +6,7 @@
 <title>KGPanel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/kg.css?v=20261030f">
+<link rel="stylesheet" href="/css/kg.css?v=20261030g">
 </head>
 <body>
 <div class="shell">
@@ -152,6 +152,10 @@
             <label>stop command <input id="setEggStop"></label>
             <label>ports (comma separated) <input id="setEggPorts"></label>
             <label>variables ({{VAR}} names, comma separated) <input id="setEggVars"></label>
+            <label style="flex-direction:row;align-items:center;gap:8px"> needs a database
+              <input type="checkbox" id="setEggDb" style="width:auto"></label>
+            <label>docker network (leave blank = default) <input id="setEggNet" placeholder="kggames-net"></label>
+            <p id="dbInfo" class="muted" style="font-size:12px;margin:6px 0 10px;display:none"></p>
             <p class="muted" style="font-size:12px;margin:6px 0 10px">edits the egg template. applies to this and future servers using it on their next start.</p>
             <div class="row" style="gap:8px">
               <button class="btn primary" id="setEggSave">save egg</button>
@@ -218,9 +222,12 @@
         <label>stop command <input id="eStop" value="stop"></label>
         <label>ports (comma separated) <input id="ePorts" value="25565/tcp"></label>
         <label>variables ({{VAR}} names, comma separated) <input id="eVars" placeholder="MEM,JAR"></label>
+        <label style="flex-direction:row;align-items:center;gap:8px"> needs a database
+          <input type="checkbox" id="eDb" style="width:auto"></label>
+        <label>docker network (kggames-net = shared DB; blank = default) <input id="eNet" placeholder="kggames-net"></label>
         <button class="btn primary" type="submit">add egg</button>
       </form>
-      <table id="eggTable"><thead><tr><th>name</th><th>image</th><th>startup</th></tr></thead><tbody></tbody></table>
+      <table id="eggTable"><thead><tr><th>name</th><th>image</th><th>db</th><th>startup</th></tr></thead><tbody></tbody></table>
     </div>
     <div id="tab-updates" class="tab" style="display:none">
       <div id="updStatus" class="mono" style="margin-bottom:12px">checking…</div>
@@ -236,6 +243,6 @@
   </div>
 </div>
 
-<script src="/js/app.js?v=20261030f"></script>
+<script src="/js/app.js?v=20261030g"></script>
 </body>
 </html>

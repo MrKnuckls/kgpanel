@@ -34,7 +34,7 @@ func ContainerName(serverID string) string {
 // the files managed through the panel file manager. hostDataDir must be the
 // path on the docker HOST (== dataDir for bare-metal wings; different when
 // wings itself runs in a container — see KGWINGS_HOST_DATA).
-func EnsureExists(ctx context.Context, hostDataDir, serverID, image string, env map[string]string, ports []string, memoryMB, cpuPercent int, startup string) (string, error) {
+func EnsureExists(ctx context.Context, hostDataDir, serverID, image string, env map[string]string, ports []string, memoryMB, cpuPercent int, startup, network string) (string, error) {
 	name := ContainerName(serverID)
 	inspectArgs := []string{"inspect", "-f", "{{.Id}}", name}
 	if _, err := run(ctx, inspectArgs...); err == nil {
@@ -42,6 +42,9 @@ func EnsureExists(ctx context.Context, hostDataDir, serverID, image string, env 
 	}
 	filesDir := filepath.Join(hostDataDir, "servers", serverID, "files")
 	args := []string{"create", "--name", name, "--restart", "unless-stopped", "-w", "/server", "-v", filesDir + ":/server"}
+	if network != "" {
+		args = append(args, "--network", network)
+	}
 	if memoryMB > 0 {
 		args = append(args, "-m", fmt.Sprintf("%dm", memoryMB))
 	}
@@ -86,7 +89,7 @@ func EnsureExists(ctx context.Context, hostDataDir, serverID, image string, env 
 // spec. Used when server settings (ports, limits, image, startup) change —
 // those are baked in at create time, so a running container must be rebuilt.
 // The server's files dir bind-mount survives (it is outside the container).
-func Recreate(ctx context.Context, hostDataDir, serverID, image string, env map[string]string, ports []string, memoryMB, cpuPercent int, startup string) error {
+func Recreate(ctx context.Context, hostDataDir, serverID, image string, env map[string]string, ports []string, memoryMB, cpuPercent int, startup, network string) error {
 	name := ContainerName(serverID)
 	wasRunning := false
 	if st, err := run(ctx, "inspect", "-f", "{{.State.Running}}", name); err == nil && st == "true" {
@@ -95,7 +98,7 @@ func Recreate(ctx context.Context, hostDataDir, serverID, image string, env map[
 	if _, err := run(ctx, "rm", "-f", name); err != nil && !strings.Contains(err.Error(), "No such") {
 		return err
 	}
-	if _, err := EnsureExists(ctx, hostDataDir, serverID, image, env, ports, memoryMB, cpuPercent, startup); err != nil {
+	if _, err := EnsureExists(ctx, hostDataDir, serverID, image, env, ports, memoryMB, cpuPercent, startup, network); err != nil {
 		return err
 	}
 	if wasRunning {

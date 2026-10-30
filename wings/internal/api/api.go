@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/net/websocket"
 
+	"kgpanel/wings/internal/db"
 	"kgpanel/wings/internal/docker"
 	"kgpanel/wings/internal/metrics"
 	"kgpanel/wings/internal/srvconfig"
@@ -50,7 +51,16 @@ func Handler(token, dataDir, hostDataDir, updateURL string, reg *metrics.Registr
 		if in.Recreate {
 			ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 			defer cancel()
-			if err := docker.Recreate(ctx, hostDataDir, r.PathValue("id"), in.Spec.Image, in.Spec.Env, in.Spec.Ports, in.Spec.MemoryMB, in.Spec.CPUPercent, in.Spec.Startup); err != nil {
+			env := in.Spec.Env
+			if in.Spec.DB {
+				var err error
+				env, err = provisionDB(ctx, hostDataDir, r.PathValue("id"), env)
+				if err != nil {
+					httpError(w, http.StatusBadGateway, err.Error())
+					return
+				}
+			}
+			if err := docker.Recreate(ctx, hostDataDir, r.PathValue("id"), in.Spec.Image, env, in.Spec.Ports, in.Spec.MemoryMB, in.Spec.CPUPercent, in.Spec.Startup, in.Spec.Network); err != nil {
 				httpError(w, http.StatusBadGateway, err.Error())
 				return
 			}
@@ -80,7 +90,16 @@ func Handler(token, dataDir, hostDataDir, updateURL string, reg *metrics.Registr
 				httpError(w, http.StatusBadRequest, "server config missing: "+err.Error())
 				return
 			}
-			if _, err := docker.EnsureExists(ctx, hostDataDir, id, sp.Image, sp.Env, sp.Ports, sp.MemoryMB, sp.CPUPercent, sp.Startup); err != nil {
+			env := sp.Env
+			if sp.DB {
+				var derr error
+				env, derr = provisionDB(ctx, hostDataDir, id, env)
+				if derr != nil {
+					httpError(w, http.StatusBadGateway, derr.Error())
+					return
+				}
+			}
+			if _, err := docker.EnsureExists(ctx, hostDataDir, id, sp.Image, env, sp.Ports, sp.MemoryMB, sp.CPUPercent, sp.Startup, sp.Network); err != nil {
 				httpError(w, http.StatusBadGateway, err.Error())
 				return
 			}
@@ -251,6 +270,25 @@ func Handler(token, dataDir, hostDataDir, updateURL string, reg *metrics.Registr
 	})
 
 	return logWrap(mux)
+}
+
+// provisionDB ensures the node's shared MariaDB + a per-server database/user,
+// then merges the KG_DB_* env vars into the container env. Called whenever a
+// server with Spec.DB true is (re)created or started.
+func provisionDB(ctx context.Context, hostDataDir, serverID string, env map[string]string) (map[string]string, error) {
+	m := db.NewManager(hostDataDir)
+	d, err := m.Provision(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]string{}
+	for k, v := range env {
+		out[k] = v
+	}
+	for k, v := range m.DBEnv(d) {
+		out[k] = v
+	}
+	return out, nil
 }
 
 func authorized(r *http.Request, token string) bool {

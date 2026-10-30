@@ -137,6 +137,8 @@ func (s *Server) pushServerConfig(sv *store.Server, recreate bool) {
 		Ports:      sv.Ports,
 		MemoryMB:   sv.MemoryMB,
 		CPUPercent: sv.CPUPercent,
+		Network:    egg.Network,
+		DB:         egg.DB,
 		Recreate:   recreate,
 	}
 	if err := s.wings.ServerConfig(n, sv.ID, sp); err != nil {
@@ -230,6 +232,8 @@ func (s *Server) handleUpdateEgg(w http.ResponseWriter, r *http.Request) {
 		e.StopCommand = in.StopCommand
 		e.Variables = in.Variables
 		e.Ports = in.Ports
+		e.Network = in.Network
+		e.DB = in.DB
 	}); err != nil {
 		writeErr(w, http.StatusNotFound, "egg not found")
 		return

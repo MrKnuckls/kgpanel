@@ -1,0 +1,20 @@
+{
+  "name": "FiveM (txAdmin)",
+  "description": "FiveM citizenserver with txAdmin — needs the Node's shared MariaDB (KG_DB_* env: host db:3306). Player traffic: 30120 tcp+udp; txAdmin web: 40120 tcp. Drag your server.cfg/resources into the files and it runs on first start.",
+  "image": "ghcr.io/parkervcp/yolks:debian",
+  "startup": "cd /server && ./alpine/opt/cfx-server/ld-musl-x86_64.so.1 --library-path \"./alpine/usr/lib/v8/:./alpine/lib/:./alpine/usr/lib/\" -- ./alpine/opt/cfx-server/FXServer +set serverProfile default +set txAdminPort 40120 +set svLicenseKey {{LICENSE}}",
+  "stop_command": "quit",
+  "variables": [
+    "LICENSE",
+    "MYSQL_USER",
+    "MYSQL_PASSWORD",
+    "MYSQL_DATABASE"
+  ],
+  "ports": [
+    "30120/tcp",
+    "30120/udp",
+    "40120/tcp"
+  ],
+  "network": "kggames-net",
+  "db": true
+}

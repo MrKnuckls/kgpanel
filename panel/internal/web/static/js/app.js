@@ -358,8 +358,18 @@ async function loadSettings() {
       $("setEggStop").value = egg.stop_command || "";
       $("setEggPorts").value = (egg.ports || []).map((p) => p.replace(/^.*?:/, "")).join(",");
       $("setEggVars").value = (egg.variables || []).join(",");
+      $("setEggDb").checked = !!egg.db;
+      $("setEggNet").value = egg.network || "";
     }
     $("setMsg").textContent = "";
+    // show DB info line on the server detail too
+    const dbLine = $("dbInfo");
+    if (dbLine) {
+      dbLine.style.display = egg && egg.db ? "block" : "none";
+      dbLine.textContent = egg && egg.db
+        ? "Database: mariadb on " + (egg.network || "kggames-net") + " — KG_DB_* env vars injected on start"
+        : "";
+    }
   } catch (e) { $("setMsg").textContent = e.message; }
 }
 $("setSave").addEventListener("click", async () => {
@@ -391,6 +401,8 @@ $("setEggSave").addEventListener("click", async () => {
         stop_command: $("setEggStop").value.trim(),
         ports: $("setEggPorts").value.split(",").map((s) => s.trim()).filter(Boolean),
         variables: $("setEggVars").value.split(",").map((s) => s.trim()).filter(Boolean),
+        db: $("setEggDb").checked,
+        network: $("setEggNet").value.trim(),
       }),
     });
     $("setEggMsg").textContent = "egg saved.";
@@ -441,12 +453,12 @@ $("nodeForm").addEventListener("submit", async (ev) => {
 });
 async function loadEggs() {
   const d = await jfetch("/eggs");
-  $("eggTable").querySelector("tbody").innerHTML = d.eggs.map((e) => `<tr><td>${esc(e.name)}</td><td class="mono">${esc(e.image)}</td><td class="mono">${esc(e.startup)}</td></tr>`).join("");
+  $("eggTable").querySelector("tbody").innerHTML = d.eggs.map((e) => `<tr><td>${esc(e.name)}</td><td class="mono">${esc(e.image)}</td><td>${e.db ? "🗄 DB" : ""}</td><td class="mono">${esc(e.startup)}</td></tr>`).join("");
 }
 $("eggForm").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   try {
-    await jfetch("/eggs/create", { method: "POST", body: JSON.stringify({ name: $("eName").value.trim(), image: $("eImage").value.trim(), startup: $("eStartup").value.trim(), stop_command: $("eStop").value.trim(), ports: $("ePorts").value.split(",").map((s) => s.trim()).filter(Boolean), variables: $("eVars").value.split(",").map((s) => s.trim().replace(/[{}]/g, "")).filter(Boolean) }) });
+    await jfetch("/eggs/create", { method: "POST", body: JSON.stringify({ name: $("eName").value.trim(), image: $("eImage").value.trim(), startup: $("eStartup").value.trim(), stop_command: $("eStop").value.trim(), ports: $("ePorts").value.split(",").map((s) => s.trim()).filter(Boolean), variables: $("eVars").value.split(",").map((s) => s.trim().replace(/[{}]/g, "")).filter(Boolean), db: $("eDb").checked, network: $("eNet").value.trim() }) });
     $("eName").value = $("eImage").value = $("eStartup").value = ""; loadEggs();
   } catch (e) { alert(e.message); }
 });

@@ -39,6 +39,12 @@ type Egg struct {
 	StopCommand string   `json:"stop_command"` // sent to console to stop cleanly
 	Variables   []string `json:"variables"`    // var names in {{...}} form
 	Ports       []string `json:"ports"`        // e.g. "25565/tcp"
+	// Network joins game containers to a shared docker network (DB games use
+	// the node's kggames-net to reach MariaDB at host "db"). Empty = bridge.
+	Network string `json:"network,omitempty"`
+	// DB requests a per-server database on the node's shared MariaDB; wings
+	// provisions DB+user and injects KG_DB_* env vars into the container.
+	DB bool `json:"db,omitempty"`
 }
 
 type Server struct {

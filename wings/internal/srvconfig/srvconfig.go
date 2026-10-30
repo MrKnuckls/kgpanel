@@ -19,6 +19,12 @@ type Spec struct {
 	Ports      []string          `json:"ports"`
 	MemoryMB   int               `json:"memory_mb"`
 	CPUPercent int               `json:"cpu_percent"`
+	// Network joins the game container to a shared docker network (e.g. the
+	// private kggames-net that hosts the node's MariaDB). Empty = default bridge.
+	Network string `json:"network,omitempty"`
+	// DB requests a per-server database on the node's shared MariaDB; wings
+	// provisions DB+user and injects KG_DB_* env vars into the container.
+	DB bool `json:"db,omitempty"`
 }
 
 func dir(dataDir, serverID string) string {
