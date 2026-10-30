@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 func run(ctx context.Context, args ...string) (string, error) {
@@ -87,11 +88,34 @@ func EnsureExists(ctx context.Context, hostDataDir, serverID, image string, env 
 // The server's files dir bind-mount survives (it is outside the container).
 func Recreate(ctx context.Context, hostDataDir, serverID, image string, env map[string]string, ports []string, memoryMB, cpuPercent int, startup string) error {
 	name := ContainerName(serverID)
+	wasRunning := false
+	if st, err := run(ctx, "inspect", "-f", "{{.State.Running}}", name); err == nil && st == "true" {
+		wasRunning = true
+	}
 	if _, err := run(ctx, "rm", "-f", name); err != nil && !strings.Contains(err.Error(), "No such") {
 		return err
 	}
-	_, err := EnsureExists(ctx, hostDataDir, serverID, image, env, ports, memoryMB, cpuPercent, startup)
-	return err
+	if _, err := EnsureExists(ctx, hostDataDir, serverID, image, env, ports, memoryMB, cpuPercent, startup); err != nil {
+		return err
+	}
+	if wasRunning {
+		if _, err := run(ctx, "start", name); err != nil {
+			return err
+		}
+		// a freshly recreated container is "created" until docker actually
+		// mounts/attaches — wait briefly so the caller sees it running.
+		for i := 0; i < 15; i++ {
+			if st, err := run(ctx, "inspect", "-f", "{{.State.Running}}", name); err == nil && st == "true" {
+				break
+			}
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(500 * time.Millisecond):
+			}
+		}
+	}
+	return nil
 }
 
 // Power maps a panel signal to docker.
