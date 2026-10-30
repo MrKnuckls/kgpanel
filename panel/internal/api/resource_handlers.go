@@ -175,9 +175,11 @@ func normalizePorts(in []string) []string {
 // up port/limit changes.
 func (s *Server) handleServerSettings(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	// pointers distinguish "not sent" from 0 — a ports-only save must not zero
+	// memory or cpu.
 	var in struct {
-		MemoryMB   int               `json:"memory_mb"`
-		CPUPercent int               `json:"cpu_percent"`
+		MemoryMB   *int              `json:"memory_mb"`
+		CPUPercent *int              `json:"cpu_percent"`
 		Ports      []string          `json:"ports"`
 		Env        map[string]string `json:"env"`
 	}
@@ -186,11 +188,11 @@ func (s *Server) handleServerSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.st.UpdateServer(id, func(sv *store.Server) {
-		if in.MemoryMB > 0 {
-			sv.MemoryMB = in.MemoryMB
+		if in.MemoryMB != nil && *in.MemoryMB > 0 {
+			sv.MemoryMB = *in.MemoryMB
 		}
-		if in.CPUPercent >= 0 {
-			sv.CPUPercent = in.CPUPercent
+		if in.CPUPercent != nil && *in.CPUPercent >= 0 {
+			sv.CPUPercent = *in.CPUPercent
 		}
 		if in.Ports != nil {
 			sv.Ports = normalizePorts(in.Ports)
