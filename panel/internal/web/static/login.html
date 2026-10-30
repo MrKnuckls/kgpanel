@@ -12,10 +12,39 @@
 <div class="auth-wrap">
   <div class="auth-card">
     <div class="logo"><img src="/img/knuckls-brass-K.png" alt="KGS"></div>
-    <h1>KGPanel</h1>
-    <div class="sub">self-hosted game server control — v1</div>
+    <h1 id="authTitle">KGPanel</h1>
+    <div class="sub" id="authSub">self-hosted game server control</div>
+
     <div id="err" class="err"></div>
-    <form id="loginForm">
+
+    <!-- first-run setup wizard -->
+    <div id="setupPnl" style="display:none">
+      <div class="wizard-step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>Create your administrator account</h3>
+          <p class="muted" style="font-size:12px;margin-bottom:14px">This is the account you'll use to manage the panel and your nodes. You can add more admins later in the admin area.</p>
+          <form id="setupForm">
+            <div>
+              <label for="suName">username</label>
+              <input id="suName" autocomplete="username" required>
+            </div>
+            <div>
+              <label for="suPass">password</label>
+              <input id="suPass" type="password" autocomplete="new-password" minlength="8" required>
+            </div>
+            <div>
+              <label for="suPass2">confirm password</label>
+              <input id="suPass2" type="password" autocomplete="new-password" required>
+            </div>
+            <button class="btn primary wide" type="submit">create admin &amp; continue</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- sign in -->
+    <form id="loginForm" style="display:none">
       <div>
         <label for="username">username</label>
         <input id="username" autocomplete="username" required>
@@ -24,11 +53,8 @@
         <label for="password">password</label>
         <input id="password" type="password" autocomplete="current-password" required>
       </div>
-      <button class="btn primary" type="submit">sign in</button>
+      <button class="btn primary wide" type="submit">sign in</button>
     </form>
-    <div id="setupNote" class="muted" style="display:none;text-align:center;font-size:12px">
-      No accounts yet — sign in with any username/password to create the admin.
-    </div>
   </div>
 </div>
 <script>
@@ -45,35 +71,62 @@ async function check() {
 }
 check();
 
-// First-run: if GET /api/me 401s AND no user exists, the panel lets you bootstrap.
+function showErr(m) { document.getElementById("err").textContent = m; }
+
+// decide: setup wizard or sign-in
+(async function init() {
+  try {
+    const r = await fetch(API + "/setup/status");
+    const d = await r.json();
+    if (d.setup_required) {
+      document.getElementById("authTitle").textContent = "Welcome";
+      document.getElementById("authSub").textContent = "first run — let's set up KGPanel";
+      document.getElementById("setupPnl").style.display = "block";
+    } else {
+      document.getElementById("loginForm").style.display = "flex";
+    }
+  } catch (e) {
+    document.getElementById("loginForm").style.display = "flex";
+  }
+})();
+
+// first-run setup: POST /api/setup creates the admin, then auto-logs-in
+document.getElementById("setupForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  showErr("");
+  const name = document.getElementById("suName").value.trim();
+  const pass = document.getElementById("suPass").value;
+  const pass2 = document.getElementById("suPass2").value;
+  if (pass !== pass2) { showErr("passwords don't match"); return; }
+  if (pass.length < 8) { showErr("password must be at least 8 characters"); return; }
+  try {
+    const r = await fetch(API + "/setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: name, password: pass }),
+    });
+    const d = await r.json();
+    if (d.token) { localStorage.setItem("kg_token", d.token); location.href = "/"; }
+    else showErr(d.error || "setup failed");
+  } catch (e) { showErr("setup failed — is the panel running?"); }
+});
+
+// sign in
 document.getElementById("loginForm").addEventListener("submit", async (ev) => {
   ev.preventDefault();
+  showErr("");
   const username = document.getElementById("username").value.trim();
   const password = document.getElementById("password").value;
-  const err = document.getElementById("err");
-  err.textContent = "";
-  // try login; if the panel has zero users it accepts this as setup
-  const r = await fetch(API + "/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  if (r.status === 401) {
-    err.textContent = "invalid credentials";
-    return;
-  }
-  if (r.status === 409) {
-    document.getElementById("setupNote").style.display = "block";
-    err.textContent = "setup already completed — try the real credentials";
-    return;
-  }
-  const d = await r.json();
-  if (d.token) {
-    localStorage.setItem("kg_token", d.token);
-    location.href = "/";
-  } else {
-    err.textContent = d.error || "unexpected response";
-  }
+  try {
+    const r = await fetch(API + "/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    const d = await r.json();
+    if (d.token) { localStorage.setItem("kg_token", d.token); location.href = "/"; }
+    else showErr(d.error || "invalid credentials");
+  } catch (e) { showErr("login failed — is the panel running?"); }
 });
 </script>
 </body>

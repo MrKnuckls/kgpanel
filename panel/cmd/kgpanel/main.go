@@ -23,6 +23,7 @@ func main() {
 	}
 	srv := api.New(st, cfg.Secret)
 	srv.SetUpdateURL(cfg.UpdateURL)
+	srv.StartScheduler()
 	ui := web.UI() // embedded html/css/js
 	log.Printf("KGPanel %s listening on %s (data: %s)", version.Version, cfg.Listen, cfg.Data)
 	if err := http.ListenAndServe(cfg.Listen, srv.Handler(ui)); err != nil {

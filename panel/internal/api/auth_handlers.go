@@ -48,6 +48,14 @@ func writeErr(w http.ResponseWriter, code int, msg string) {
 
 // --- setup (one-time admin bootstrap) ---
 
+// handleSetupStatus reports whether first-run setup is needed.
+// GET /api/setup/status -> {"setup_required": bool}
+func (s *Server) handleSetupStatus(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]bool{
+		"setup_required": s.st.UserCount() == 0,
+	})
+}
+
 func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeErr(w, http.StatusMethodNotAllowed, "POST only")

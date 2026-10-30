@@ -42,17 +42,29 @@ type Egg struct {
 }
 
 type Server struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	OwnerID     string    `json:"owner_id"`
-	NodeID      string    `json:"node_id"`
-	EggID       string    `json:"egg_id"`
-	MemoryMB    int       `json:"memory_mb"`
-	CPUPercent  int       `json:"cpu_percent"`
-	Ports       []string  `json:"ports"`
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	OwnerID     string            `json:"owner_id"`
+	NodeID      string            `json:"node_id"`
+	EggID       string            `json:"egg_id"`
+	MemoryMB    int               `json:"memory_mb"`
+	CPUPercent  int               `json:"cpu_percent"`
+	Ports       []string          `json:"ports"`
 	Env         map[string]string `json:"env"`
-	ContainerID string    `json:"container_id,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
+	ContainerID string            `json:"container_id,omitempty"`
+	CreatedAt   time.Time         `json:"created_at"`
+}
+
+type Schedule struct {
+	ID        string    `json:"id"`
+	ServerID  string    `json:"server_id"`
+	Name      string    `json:"name"`
+	Cron      string    `json:"cron"` // 5-field: min hour dom month dow
+	Action    string    `json:"action"` // start | stop | restart
+	Enabled   bool       `json:"enabled"`
+	LastRun   *time.Time `json:"last_run"`
+	LastError string     `json:"last_error"`
+	CreatedAt time.Time  `json:"created_at"`
 }
 
 type AuditEntry struct {
@@ -64,15 +76,17 @@ type AuditEntry struct {
 }
 
 // Store is the whole persistence layer. Files: users.json, nodes.json, eggs.json,
-// servers.json, audit.json — rewritten atomically (tmp+rename) on each mutation.
+// servers.json, schedules.json, audit.json — rewritten atomically (tmp+rename)
+// on each mutation.
 type Store struct {
-	mu      sync.Mutex
-	dir     string
-	users   map[string]*User
-	nodes   map[string]*Node
-	eggs    map[string]*Egg
-	servers map[string]*Server
-	audit   []AuditEntry
+	mu        sync.Mutex
+	dir       string
+	users     map[string]*User
+	nodes     map[string]*Node
+	eggs      map[string]*Egg
+	servers   map[string]*Server
+	schedules map[string]*Schedule
+	audit     []AuditEntry
 }
 
 func New(dir string) (*Store, error) {
@@ -80,12 +94,13 @@ func New(dir string) (*Store, error) {
 		return nil, err
 	}
 	s := &Store{
-		dir:     dir,
-		users:   map[string]*User{},
-		nodes:   map[string]*Node{},
-		eggs:    map[string]*Egg{},
-		servers: map[string]*Server{},
-		audit:   []AuditEntry{},
+		dir:       dir,
+		users:     map[string]*User{},
+		nodes:     map[string]*Node{},
+		eggs:      map[string]*Egg{},
+		servers:   map[string]*Server{},
+		schedules: map[string]*Schedule{},
+		audit:     []AuditEntry{},
 	}
 	if err := s.load("users.json", &s.users); err != nil {
 		return nil, err
@@ -97,6 +112,9 @@ func New(dir string) (*Store, error) {
 		return nil, err
 	}
 	if err := s.load("servers.json", &s.servers); err != nil {
+		return nil, err
+	}
+	if err := s.load("schedules.json", &s.schedules); err != nil {
 		return nil, err
 	}
 	if err := s.load("audit.json", &s.audit); err != nil {
@@ -249,6 +267,72 @@ func (s *Store) SetServerContainer(id, containerID string) error {
 	}
 	sv.ContainerID = containerID
 	return s.save("servers.json", s.servers)
+}
+
+// --- schedules ---
+
+func (s *Store) CreateSchedule(sc *Schedule) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sc.ID = newID()
+	sc.CreatedAt = time.Now()
+	sc.Enabled = true
+	s.schedules[sc.ID] = sc
+	return s.save("schedules.json", s.schedules)
+}
+
+func (s *Store) ListSchedules(serverID string) []*Schedule {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]*Schedule, 0, len(s.schedules))
+	for _, sc := range s.schedules {
+		if sc.ServerID == serverID {
+			out = append(out, sc)
+		}
+	}
+	return out
+}
+
+func (s *Store) GetSchedule(id string) *Schedule {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.schedules[id]
+}
+
+func (s *Store) DeleteSchedule(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.schedules, id)
+	return s.save("schedules.json", s.schedules)
+}
+
+// MarkScheduleRun records the outcome of a schedule execution.
+func (s *Store) MarkScheduleRun(id string, runErr error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sc, ok := s.schedules[id]
+	if !ok {
+		return
+	}
+	now := time.Now()
+	sc.LastRun = &now
+	if runErr != nil {
+		sc.LastError = runErr.Error()
+	} else {
+		sc.LastError = ""
+	}
+	_ = s.save("schedules.json", s.schedules)
+}
+
+// AllSchedules returns every schedule in the store (cron engine).
+func (s *Store) AllSchedules() []*Schedule {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]*Schedule, 0, len(s.schedules))
+	for _, sc := range s.schedules {
+		out = append(out, sc)
+	}
+	return out
 }
 
 // --- audit ---

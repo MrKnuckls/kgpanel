@@ -120,6 +120,70 @@ func Handler(token, dataDir, updateURL string) http.Handler {
 		writeJSON(w, http.StatusOK, st)
 	})
 
+	// files: list/read/upload/mkdir/delete under <dataDir>/servers/<id>/files
+	mux.HandleFunc("/v1/servers/{id}/files", func(w http.ResponseWriter, r *http.Request) {
+		if !checkAuth(w, r, token) {
+			return
+		}
+		handleFilesList(w, r, dataDir)
+	})
+	mux.HandleFunc("/v1/servers/{id}/files/upload", func(w http.ResponseWriter, r *http.Request) {
+		if !checkAuth(w, r, token) {
+			return
+		}
+		handleFilesUpload(w, r, dataDir)
+	})
+	mux.HandleFunc("/v1/servers/{id}/files/mkdir", func(w http.ResponseWriter, r *http.Request) {
+		if !checkAuth(w, r, token) {
+			return
+		}
+		handleFilesMkdir(w, r, dataDir)
+	})
+	mux.HandleFunc("/v1/servers/{id}/files/delete", func(w http.ResponseWriter, r *http.Request) {
+		if !checkAuth(w, r, token) {
+			return
+		}
+		handleFilesDelete(w, r, dataDir)
+	})
+	mux.HandleFunc("/v1/servers/{id}/files/download", func(w http.ResponseWriter, r *http.Request) {
+		if !checkAuth(w, r, token) {
+			return
+		}
+		handleFilesDownload(w, r, dataDir)
+	})
+
+	// backups: list/create/download/restore/delete under <dataDir>/servers/<id>/backups
+	mux.HandleFunc("/v1/servers/{id}/backups", func(w http.ResponseWriter, r *http.Request) {
+		if !checkAuth(w, r, token) {
+			return
+		}
+		handleBackupsList(w, r, dataDir)
+	})
+	mux.HandleFunc("/v1/servers/{id}/backups/create", func(w http.ResponseWriter, r *http.Request) {
+		if !checkAuth(w, r, token) {
+			return
+		}
+		handleBackupsCreate(w, r, dataDir)
+	})
+	mux.HandleFunc("/v1/servers/{id}/backups/download", func(w http.ResponseWriter, r *http.Request) {
+		if !checkAuth(w, r, token) {
+			return
+		}
+		handleBackupsDownload(w, r, dataDir)
+	})
+	mux.HandleFunc("/v1/servers/{id}/backups/restore", func(w http.ResponseWriter, r *http.Request) {
+		if !checkAuth(w, r, token) {
+			return
+		}
+		handleBackupsRestore(w, r, dataDir)
+	})
+	mux.HandleFunc("/v1/servers/{id}/backups/delete", func(w http.ResponseWriter, r *http.Request) {
+		if !checkAuth(w, r, token) {
+			return
+		}
+		handleBackupsDelete(w, r, dataDir)
+	})
+
 	// health
 	mux.HandleFunc("/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "data": dataDir, "version": version.Version})

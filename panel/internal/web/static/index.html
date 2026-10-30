@@ -9,46 +9,117 @@
 <link rel="stylesheet" href="/css/kg.css">
 </head>
 <body>
-<header class="topbar">
-  <img class="brand" src="/img/knuckls-brass-K.png" alt="KGS">
-  <div class="title">KGPanel <span class="ver">v1</span></div>
-  <div class="spacer"></div>
-  <span class="user" id="whoami"></span>
-  <button class="btn small" id="logout">log out</button>
-</header>
+<div class="shell">
 
-<div class="wrap">
-  <div class="row" style="margin-bottom:18px">
-    <h2 style="flex:1">Servers</h2>
-    <button class="btn primary" id="newServer">+ new server</button>
-    <button class="btn" id="adminBtn">admin</button>
-  </div>
-  <div id="serverGrid" class="grid"></div>
-  <div id="empty" class="card muted" style="display:none;text-align:center;padding:40px">
-    No servers yet — deploy your first one.
-  </div>
-</div>
+  <!-- left sidebar -->
+  <aside class="sidebar">
+    <div class="side-head">
+      <img class="brand" src="/img/knuckls-brass-K.png" alt="KGS">
+      <div class="side-title">KGPanel <span class="ver">v1</span></div>
+    </div>
 
-<!-- server detail modal -->
-<div id="detail" class="modal" style="display:none">
-  <div class="modal-card card">
-    <div class="row" style="margin-bottom:12px">
-      <h2 id="dName" style="flex:1"></h2>
-      <span id="dBadge" class="badge"><span class="dot"></span><span id="dState">—</span></span>
+    <div class="side-label">servers</div>
+    <nav id="serverList" class="side-nav"></nav>
+
+    <div class="side-foot">
+      <button class="side-link" id="adminBtn">admin</button>
+      <div class="side-user" id="whoami"></div>
+      <button class="side-link" id="logout">log out</button>
     </div>
-    <div class="power-row">
-      <button class="btn small" data-power="start">start</button>
-      <button class="btn small" data-power="restart">restart</button>
-      <button class="btn small" data-power="stop">stop</button>
-      <button class="btn small danger" data-power="kill">kill</button>
-      <span class="spark" id="dMeta"></span>
+  </aside>
+
+  <!-- main column -->
+  <main class="main">
+    <!-- dashboard view -->
+    <div id="viewDash">
+      <div class="main-head">
+        <h1>Servers</h1>
+        <div class="row" style="gap:8px">
+          <button class="btn primary" id="newServer">+ new server</button>
+        </div>
+      </div>
+
+      <div id="serverGrid" class="grid"></div>
+      <div id="empty" class="card muted" style="display:none;text-align:center;padding:40px">
+        No servers yet — deploy your first one.
+      </div>
     </div>
-    <div id="console" class="mono">connecting…</div>
-    <div class="row" style="margin-top:10px">
-      <input id="cmd" placeholder="type a console command" style="flex:1" autocomplete="off">
-      <button class="btn" id="sendCmd">send</button>
+
+    <!-- server detail view -->
+    <div id="viewDetail" style="display:none">
+      <div class="detail-head">
+        <div class="row" style="gap:10px">
+          <button class="icon-btn" id="backBtn" title="back">←</button>
+          <h2 id="dName" style="flex:1"></h2>
+          <span id="dBadge" class="badge"><span class="dot"></span><span id="dState">—</span></span>
+        </div>
+        <div class="power-row">
+          <button class="pwr start" data-power="start" title="start">▶</button>
+          <button class="pwr restart" data-power="restart" title="restart">⟳</button>
+          <button class="pwr stop" data-power="stop" title="stop">■</button>
+          <button class="pwr kill danger" data-power="kill" title="kill">⛔</button>
+          <span class="spark" id="dMeta"></span>
+        </div>
+      </div>
+
+      <div class="detail-tabs">
+        <button class="dtab active" data-tab="console">console</button>
+        <button class="dtab" data-tab="files">files</button>
+        <button class="dtab" data-tab="schedules">schedules</button>
+        <button class="dtab" data-tab="backups">backups</button>
+        <button class="dtab" data-tab="info">info</button>
+      </div>
+
+      <div id="dtab-console" class="dtab-pane">
+        <div id="console" class="term">
+          <div class="term-line muted">connecting…</div>
+        </div>
+        <div class="term-input">
+          <span class="term-prompt">&gt;</span>
+          <input id="cmd" placeholder="type a console command and press enter" autocomplete="off" spellcheck="false">
+        </div>
+      </div>
+
+      <div id="dtab-files" class="dtab-pane" style="display:none">
+        <div class="files-head">
+          <span class="mono muted" id="filePath">/</span>
+          <div class="row" style="gap:6px;margin-left:auto">
+            <button class="btn small" id="fUp">⬆ up</button>
+            <button class="btn small" id="fMkdir">+ folder</button>
+            <button class="btn small primary" id="fUpload">upload</button>
+          </div>
+        </div>
+        <table id="fileTable"><thead><tr><th>name</th><th>size</th><th>modified</th><th></th></tr></thead><tbody></tbody></table>
+        <input type="file" id="fFile" style="display:none" multiple>
+      </div>
+
+      <div id="dtab-schedules" class="dtab-pane" style="display:none">
+        <div class="row" style="margin-bottom:12px">
+          <input id="sName" placeholder="name (e.g. nightly restart)" style="flex:1">
+          <input id="sCron" placeholder="cron (e.g. 0 4 * * *)" style="flex:1">
+          <select id="sAction" style="width:auto">
+            <option value="restart">restart</option>
+            <option value="start">start</option>
+            <option value="stop">stop</option>
+          </select>
+          <button class="btn primary" id="sAdd">add schedule</button>
+        </div>
+        <table id="scheduleTable"><thead><tr><th>name</th><th>cron</th><th>action</th><th>last run</th><th></th></tr></thead><tbody></tbody></table>
+      </div>
+
+      <div id="dtab-backups" class="dtab-pane" style="display:none">
+        <div class="row" style="margin-bottom:12px">
+          <button class="btn primary" id="bCreate">create backup</button>
+          <span class="muted mono" id="bHint" style="font-size:12px"></span>
+        </div>
+        <table id="backupTable"><thead><tr><th>name</th><th>size</th><th>created</th><th></th></tr></thead><tbody></tbody></table>
+      </div>
+
+      <div id="dtab-info" class="dtab-pane" style="display:none">
+        <div class="info-grid" id="dInfo"></div>
+      </div>
     </div>
-  </div>
+  </main>
 </div>
 
 <!-- create server modal -->

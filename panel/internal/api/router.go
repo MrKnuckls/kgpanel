@@ -22,6 +22,7 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/api/setup", s.handleSetup)
+	mux.HandleFunc("/api/setup/status", s.handleSetupStatus)
 	mux.HandleFunc("/api/login", s.handleLogin)
 
 	// protected API
@@ -34,6 +35,19 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.Handle("/api/servers/create", s.auth(http.HandlerFunc(s.handleCreateServer)))
 	mux.Handle("/api/servers/{id}/power", s.auth(http.HandlerFunc(s.handlePower)))
 	mux.Handle("/api/servers/{id}/status", s.auth(http.HandlerFunc(s.handleStatus)))
+	mux.Handle("/api/servers/{id}/files", s.auth(http.HandlerFunc(s.handleFilesList)))
+	mux.Handle("/api/servers/{id}/files/upload", s.auth(http.HandlerFunc(s.handleFilesUpload)))
+	mux.Handle("/api/servers/{id}/files/mkdir", s.auth(http.HandlerFunc(s.handleFilesMkdir)))
+	mux.Handle("/api/servers/{id}/files/delete", s.auth(http.HandlerFunc(s.handleFilesDelete)))
+	mux.Handle("/api/servers/{id}/files/download", s.auth(http.HandlerFunc(s.handleFilesDownload)))
+	mux.Handle("/api/servers/{id}/backups", s.auth(http.HandlerFunc(s.handleBackupsList)))
+	mux.Handle("/api/servers/{id}/backups/create", s.auth(http.HandlerFunc(s.handleBackupsCreate)))
+	mux.Handle("/api/servers/{id}/backups/delete", s.auth(http.HandlerFunc(s.handleBackupsDelete)))
+	mux.Handle("/api/servers/{id}/backups/restore", s.auth(http.HandlerFunc(s.handleBackupsRestore)))
+	mux.Handle("/api/servers/{id}/backups/download", s.auth(http.HandlerFunc(s.handleBackupsDownload)))
+	mux.Handle("/api/servers/{id}/schedules", s.auth(http.HandlerFunc(s.handleSchedulesList)))
+	mux.Handle("/api/servers/{id}/schedules/create", s.auth(http.HandlerFunc(s.handleSchedulesCreate)))
+	mux.Handle("/api/servers/{id}/schedules/{sid}/delete", s.auth(http.HandlerFunc(s.handleSchedulesDelete)))
 	mux.Handle("/api/audit", s.auth(http.HandlerFunc(s.handleAudit)))
 	mux.Handle("/api/update/check", s.auth(http.HandlerFunc(s.handleUpdateCheck)))
 	mux.Handle("/api/update", s.auth(http.HandlerFunc(s.handleUpdate)))
