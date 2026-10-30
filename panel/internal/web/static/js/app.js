@@ -142,8 +142,31 @@ async function refreshStatus() {
     const dd = await jfetch("/servers");
     const sv = dd.servers.find((x) => x.id === currentServer);
     if (sv) { $("dName").textContent = sv.name; $("dMeta").textContent = `${sv.memory_mb}MB · ${sv.cpu_percent}%`; }
+    showConnect(sv);
   } catch (e) { $("dState").textContent = "unreachable"; }
 }
+
+/* connection address = node host + first published port */
+function showConnect(sv) {
+  const box = $("connectBox");
+  const addr = $("connectAddr");
+  let nodeHost = (sv.node_url || "").replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  if (nodeHost.includes(":")) nodeHost = nodeHost.split(":")[0]; // strip wings port (8081)
+  const ports = (sv.ports || []);
+  const first = ports[0] ? ports[0].replace(/\/.*$/, "").replace(/^\d+:?/, "") : "";
+  const proto = ports[0] && ports[0].includes("/udp") ? " (udp)" : "";
+  if (!nodeHost || !first) { box.style.display = "none"; return; }
+  addr.textContent = `${nodeHost}:${first}${proto ? " " + proto : ""}`;
+  box.title = "join address for this server (host:port)";
+  box.style.display = "flex";
+}
+$("copyAddr").addEventListener("click", () => {
+  const a = $("connectAddr").textContent.trim();
+  navigator.clipboard?.writeText(a).then(() => {
+    const b = $("copyAddr"); const old = b.textContent; b.textContent = "copied!";
+    setTimeout(() => (b.textContent = old), 1200);
+  }).catch(() => {});
+});
 document.querySelectorAll("[data-power]").forEach((b) => b.addEventListener("click", async () => {
   const signal = b.dataset.power;
   try {

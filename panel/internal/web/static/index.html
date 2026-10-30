@@ -6,7 +6,7 @@
 <title>KGPanel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/kg.css?v=20261030a">
+<link rel="stylesheet" href="/css/kg.css?v=20261030b">
 </head>
 <body>
 <div class="shell">
@@ -52,6 +52,11 @@
           <button class="icon-btn" id="backBtn" title="back">←</button>
           <h2 id="dName" style="flex:1"></h2>
           <span id="dBadge" class="badge"><span class="dot"></span><span id="dState">—</span></span>
+        </div>
+        <div class="connect-box" id="connectBox" style="display:none">
+          <span class="connect-label">connect</span>
+          <code id="connectAddr" class="connect-addr"></code>
+          <button class="btn small" id="copyAddr" title="copy">copy</button>
         </div>
         <div class="power-row">
           <button class="pwr start" data-power="start" title="start">▶</button>
@@ -197,6 +202,6 @@
   </div>
 </div>
 
-<script src="/js/app.js?v=20261030a"></script>
+<script src="/js/app.js?v=20261030b"></script>
 </body>
 </html>

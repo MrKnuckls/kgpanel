@@ -176,6 +176,9 @@ a:hover { text-decoration: underline; }
 .detail-head { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
 .detail-head h2 { font-size: 20px; }
 .power-row { display: flex; align-items: center; gap: 8px; }
+.connect-box { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; }
+.connect-label { text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px; color: var(--muted, #8b949e); }
+.connect-addr { font-family: var(--mono, "JetBrains Mono", monospace); color: var(--accent); user-select: all; }
 .spark-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
 .spark-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
 .spark-title { text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px; color: var(--muted, #8b949e); margin-bottom: 4px; }

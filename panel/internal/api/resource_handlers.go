@@ -72,6 +72,7 @@ func (s *Server) handleServers(w http.ResponseWriter, r *http.Request) {
 	type row struct {
 		*store.Server
 		NodeName string `json:"node_name"`
+		NodeURL  string `json:"node_url"`
 		EggName  string `json:"egg_name"`
 	}
 	rows := make([]row, 0, len(servers))
@@ -79,6 +80,7 @@ func (s *Server) handleServers(w http.ResponseWriter, r *http.Request) {
 		rw := row{Server: sv}
 		if n := s.st.GetNode(sv.NodeID); n != nil {
 			rw.NodeName = n.Name
+			rw.NodeURL = n.URL
 		}
 		if e := s.st.GetEgg(sv.EggID); e != nil {
 			rw.EggName = e.Name
