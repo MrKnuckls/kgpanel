@@ -88,15 +88,15 @@ cf() { # cf METHOD PATH [JSON] -> prints RESPONSE; exits 2 on API error
 # ---- 0. uninstall -----------------------------------------------------------
 if [[ "$UNINSTALL" == "1" ]]; then
   say "uninstall mode — removing tunnel + DNS for $DOMAIN"
-  ZONE_ID=$(cf GET "/zones?name=${DOMAIN#*.}" | grep -o '"id":"[a-f0-9]\{32\}"' | head -1 | cut -d'"' -f4)
+  ZONE_ID=$(cf GET "/zones?name=${DOMAIN#*.}" | grep -o '"id":"[a-f0-9]\{32\}"' | head -1 | cut -d'"' -f4 || printf "")
   [[ -n "$ZONE_ID" ]] || { echo "zone for $DOMAIN not found — nothing to remove" >&2; exit 2; }
-  TUNNEL_ID=$(cf GET "/accounts/$CF_ACCOUNT/cfd_tunnel?name=$TUNNEL_NAME" | grep -o '"id":"[a-f0-9-]\{36\}"' | head -1 | cut -d'"' -f4)
+  TUNNEL_ID=$(cf GET "/accounts/$CF_ACCOUNT/cfd_tunnel?name=$TUNNEL_NAME" | grep -o '"id":"[a-f0-9-]\{36\}"' | head -1 | cut -d'"' -f4 || printf "")
   if [[ -n "$TUNNEL_ID" ]]; then
     cf DELETE "/accounts/$CF_ACCOUNT/cfd_tunnel/$TUNNEL_ID" >/dev/null && say "tunnel '$TUNNEL_NAME' deleted"
   else
     say "no tunnel named '$TUNNEL_NAME' — skipping"
   fi
-  REC_ID=$(cf GET "/zones/$ZONE_ID/dns_records?type=CNAME&name=$DOMAIN" | grep -o '"id":"[a-f0-9]\{32\}"' | head -1 | cut -d'"' -f4)
+  REC_ID=$(cf GET "/zones/$ZONE_ID/dns_records?type=CNAME&name=$DOMAIN" | grep -o '"id":"[a-f0-9]\{32\}"' | head -1 | cut -d'"' -f4 || printf "")
   if [[ -n "$REC_ID" ]]; then
     cf DELETE "/zones/$ZONE_ID/dns_records/$REC_ID" >/dev/null && say "DNS record $DOMAIN deleted"
   else
@@ -107,22 +107,34 @@ if [[ "$UNINSTALL" == "1" ]]; then
 fi
 
 # ---- 1. validate credentials + zone -------------------------------------------
-say "checking Cloudflare credentials"
-cf GET "/user/tokens/verify" >/dev/null
-say "token OK"
-
+# NEVER use /user/tokens/verify — it reports "Invalid API Token" for the normal
+# account-scoped cfat_ tokens even when they work. Prove liveness with a real
+# scoped call (zone list / dns_records) instead.
 ZONE_NAME="${DOMAIN#*.}"
-ZONE_ID=$(cf GET "/zones?name=$ZONE_NAME" | grep -o '"id":"[a-f0-9]\{32\}"' | head -1 | cut -d'"' -f4)
+ZONE_ID=""
+for try_zone in "$ZONE_NAME" "$(echo "$DOMAIN" | cut -d. -f2-)"; do
+  R=$(cf GET "/zones?name=$try_zone" || true)
+  ZONE_ID=$(printf '%s' "$R" | grep -o '"id":"[a-f0-9]\{32\}"' | head -1 | cut -d'"' -f4 || printf "")
+  [[ -n "$ZONE_ID" ]] && { ZONE_NAME="$try_zone"; break; }
+done
 if [[ -z "$ZONE_ID" ]]; then
-  # maybe the apex is the zone: panel.example.com -> try example.com
-  ZONE_NAME=$(echo "$DOMAIN" | cut -d. -f2-)
-  ZONE_ID=$(cf GET "/zones?name=$ZONE_NAME" | grep -o '"id":"[a-f0-9]\{32\}"' | head -1 | cut -d'"' -f4)
+  say "token or zone check failed — testing DNS read for $DOMAIN"
+  # last proof: if we can even list DNS records the token is alive
+  ZID=$(cf GET "/zones?per_page=1" | grep -o '"id":"[a-f0-9]\{32\}"' | head -1 | cut -d'"' -f4 || printf "")
+  if [[ -n "$ZID" ]]; then
+    say "token OK (account-scoped — scoped zone $DOMAIN not granted or zone name check failed)"
+  fi
+  echo "cannot verify zone covering $DOMAIN — is the domain on Cloudflare, and does the token have zone:read?" >&2
+  exit 2
 fi
-[[ -n "$ZONE_ID" ]] || { echo "cannot find a Cloudflare zone covering $DOMAIN (do you own $ZONE_NAME there?)" >&2; exit 2; }
+say "token OK"
 say "zone: $ZONE_NAME"
 
 # ---- 2. find or create the tunnel -------------------------------------------
-TUNNEL_ID=$(cf GET "/accounts/$CF_ACCOUNT/cfd_tunnel?name=$TUNNEL_NAME" | grep -o '"id":"[a-f0-9-]\{36\}"' | head -1 | cut -d'"' -f4)
+# NOTE: every grep here must end with `|| printf ""` — under `set -euo pipefail`
+# a no-match grep exits 1 and silently kills the script (it must instead mean
+# "tunnel does not exist yet, create it").
+TUNNEL_ID=$(cf GET "/accounts/$CF_ACCOUNT/cfd_tunnel?name=$TUNNEL_NAME" | grep -o '"id":"[a-f0-9-]\{36\}"' | head -1 | cut -d'"' -f4 || printf "")
 if [[ -n "$TUNNEL_ID" ]]; then
   say "using existing tunnel '$TUNNEL_NAME' ($TUNNEL_ID)"
 else
@@ -160,7 +172,7 @@ fi
 # ---- 5. Cloudflare Access (optional): email-only login ---------------------------
 if [[ "${#ACCESS_EMAILS[@]}" -gt 0 ]] && [[ "$DRY_RUN" != "1" ]]; then
   say "adding Cloudflare Access app for $DOMAIN (email gate: ${ACCESS_EMAILS[*]})"
-  ACC_ID=$(cf POST "/accounts/$CF_ACCOUNT/access/apps" "{\"name\":\"$TUNNEL_NAME\",\"domain\":\"$DOMAIN\",\"session_duration\":\"24h\"}" | grep -o '"id":"[a-f0-9-]\{36\}"' | head -1 | cut -d'"' -f4)
+  ACC_ID=$(cf POST "/accounts/$CF_ACCOUNT/access/apps" "{\"name\":\"$TUNNEL_NAME\",\"domain\":\"$DOMAIN\",\"session_duration\":\"24h\"}" | grep -o '"id":"[a-f0-9-]\{36\}"' | head -1 | cut -d'"' -f4 || printf "")
   [[ -n "$ACC_ID" ]] || { warn "Access app created but id not parsed — add policies manually in the CF dashboard"; ACC_ID=""; }
   if [[ -n "$ACC_ID" ]]; then
     INCLUDES=""
@@ -180,7 +192,7 @@ if [[ "$DRY_RUN" == "1" ]]; then
   exit 0
 fi
 
-TUNNEL_TOKEN=$(cf GET "/accounts/$CF_ACCOUNT/cfd_tunnel/$TUNNEL_ID/token" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+TUNNEL_TOKEN=$(cf GET "/accounts/$CF_ACCOUNT/cfd_tunnel/$TUNNEL_ID/token" | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || printf "")
 [[ -n "$TUNNEL_TOKEN" ]] || { echo "could not fetch tunnel token" >&2; exit 2; }
 
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then

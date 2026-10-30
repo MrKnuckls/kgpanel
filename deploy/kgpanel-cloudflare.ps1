@@ -57,17 +57,27 @@ function Get-TunnelId {
 }
 
 # ---- 1. validate credentials + zone ---------------------------------------------
+# NEVER use /user/tokens/verify — it reports "Invalid API Token" for the normal
+# account-scoped cfat_ tokens even when they work. Prove liveness with a real
+# scoped call (zone lookup) instead.
 Write-Step "checking Cloudflare credentials"
-Invoke-CF GET "/user/tokens/verify" | Out-Null
-Write-Step "token OK"
 
 $zoneName = $Domain -replace '^[^.]+\.', ''
-$zone = Invoke-CF GET "/zones?name=$zoneName" | Select-Object -First 1
-if (-not $zone) {
-  $zoneName = $Domain.Substring($Domain.IndexOf('.') + 1)  # apex try
-  $zone = Invoke-CF GET "/zones?name=$zoneName" | Select-Object -First 1
+$zone = $null
+foreach ($try in @($zoneName, $Domain.Substring($Domain.IndexOf('.') + 1))) {
+  try {
+    $zone = Invoke-CF GET "/zones?name=$try" | Select-Object -First 1
+  } catch { $zone = $null }
+  if ($zone) { $zoneName = $try; break }
 }
-if (-not $zone) { throw "cannot find a Cloudflare zone covering $Domain (do you own $zoneName there?)" }
+if (-not $zone) {
+  try {
+    $probe = Invoke-CF GET "/zones?per_page=1" | Select-Object -First 1
+    if ($probe) { throw "token is alive but no zone covers $Domain (account-scoped token, zone:read missing for $Domain?)" }
+  } catch { }
+  throw "cannot verify a Cloudflare zone covering $Domain (is the domain on Cloudflare, and does the token have zone:read?)"
+}
+Write-Step "token OK"
 $zoneId = $zone.id
 Write-Step "zone: $zoneName"
 
