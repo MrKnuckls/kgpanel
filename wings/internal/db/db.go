@@ -184,6 +184,23 @@ func Sanitize(s string) string {
 	return b.String()
 }
 
+// Drop removes the server's database and user (server deletion path).
+// Idempotent: missing DB/user are ignored (DROP IF EXISTS).
+func (m *Manager) Drop(ctx context.Context, serverID string) error {
+	safe := Sanitize(serverID)
+	qs := []string{
+		"DROP DATABASE IF EXISTS `kg_" + safe + "`",
+		"DROP USER IF EXISTS 'kgu_" + safe + "'@'%'",
+		"FLUSH PRIVILEGES",
+	}
+	for _, q := range qs {
+		if _, err := m.sql(ctx, q); err != nil {
+			return fmt.Errorf("db: drop %s: %w", q, err)
+		}
+	}
+	return nil
+}
+
 // DBEnv returns the KG_* env vars a game container should receive to use the
 // provisioned database.
 func (m *Manager) DBEnv(d *Database) map[string]string {

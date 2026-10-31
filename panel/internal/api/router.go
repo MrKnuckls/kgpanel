@@ -59,6 +59,7 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.Handle("/api/servers/{id}/sftp", s.auth(s.perm("control", http.HandlerFunc(s.handleServerSFTP))))
 	mux.Handle("/api/servers/{id}/details", s.auth(s.perm("admin", http.HandlerFunc(s.handleServerDetails))))
 	mux.Handle("/api/servers/{id}/reinstall", s.auth(s.perm("control", http.HandlerFunc(s.handleServerReinstall))))
+	mux.Handle("/api/servers/{id}/delete", s.auth(s.perm("admin", http.HandlerFunc(s.handleServerDelete))))
 	mux.Handle("/api/audit", s.auth(http.HandlerFunc(s.handleAudit)))
 	mux.Handle("/api/update/check", s.auth(http.HandlerFunc(s.handleUpdateCheck)))
 	mux.Handle("/api/update/status", s.auth(http.HandlerFunc(s.handleUpdateStatus)))

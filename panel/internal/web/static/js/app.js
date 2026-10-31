@@ -75,8 +75,8 @@ function applyPermUI() {
   showTab("schedules", canControl);
   showTab("backups", canControl);
   // settings-tab cards + header action buttons carry data-perm
-  // (details=admin, sftp/danger/repair/reinstall=control)
-  document.querySelectorAll("#dtab-settings .card[data-perm], .detail-head [data-perm]").forEach((c) => {
+  // (details=admin, sftp/danger/repair/reinstall=control, delete=admin)
+  document.querySelectorAll("#dtab-settings [data-perm], .detail-head [data-perm]").forEach((c) => {
     c.style.display = hasPerm(c.dataset.perm) ? "" : "none";
   });
   // hide the console command bar for view-only users
@@ -607,6 +607,20 @@ async function dangerAction(wipe) {
 }
 $("repairBtn").addEventListener("click", () => dangerAction(false));
 $("reinstallBtn").addEventListener("click", () => dangerAction(true));
+$("delServerBtn").addEventListener("click", async () => {
+  const name = currentServer;
+  const msg = $("dangerMsg");
+  if (!confirm("DELETE SERVER " + name + "?\n\nThis PERMANENTLY removes the server: container, ALL files, saves, config, and its database (if it has one). This cannot be undone.")) return;
+  const p = prompt("Type the server name '" + name + "' to confirm deletion:");
+  if (p !== name) { msg.textContent = "name didn't match — nothing deleted."; return; }
+  try {
+    msg.textContent = "deleting…";
+    await jfetch("/servers/" + currentServer + "/delete", { method: "DELETE" });
+    msg.textContent = "server deleted.";
+    showDash();
+    refresh();
+  } catch (e) { msg.textContent = "delete failed: " + e.message; }
+});
 
 /* ---------- header action buttons (SFTP / details / repair / reinstall) ---------- */
 function openModal(id) { $(id).style.display = "flex"; }

@@ -305,6 +305,24 @@ func (s *Store) ListServers() []*Server {
 	return out
 }
 
+// DeleteServer removes the server record plus its schedules from the store.
+// The container/files/db teardown happens on wings first (via the destroy
+// endpoint); this only forgets the panel-side records.
+func (s *Store) DeleteServer(serverID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.servers, serverID)
+	for id, sc := range s.schedules {
+		if sc.ServerID == serverID {
+			delete(s.schedules, id)
+		}
+	}
+	if err := s.save("servers.json", s.servers); err != nil {
+		return err
+	}
+	return s.save("schedules.json", s.schedules)
+}
+
 func (s *Store) GetServer(id string) *Server {
 	s.mu.Lock()
 	defer s.mu.Unlock()

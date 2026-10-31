@@ -111,6 +111,38 @@ func (s *Server) handleServerReinstall(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": "true", "wipe_files": in.WipeFiles})
 }
 
+// handleServerDelete permanently destroys a server: wings removes the
+// container + files + database, then the panel forgets the record.
+// DELETE /api/servers/{id} (admin+)
+func (s *Server) handleServerDelete(w http.ResponseWriter, r *http.Request) {
+	serverID := r.PathValue("id")
+	sv := s.st.GetServer(serverID)
+	if sv == nil {
+		writeErr(w, http.StatusNotFound, "server not found")
+		return
+	}
+	n := s.st.GetNode(sv.NodeID)
+	if n == nil {
+		writeErr(w, http.StatusNotFound, "node not found")
+		return
+	}
+	if err := s.wings.Destroy(n, serverID); err != nil {
+		log.Printf("destroy %s: %v", sv.Name, err)
+		msg := "wings unreachable: " + err.Error()
+		if strings.Contains(err.Error(), "401") {
+			msg = "wings rejected the token (restart kgpanel to reload node tokens)"
+		}
+		writeErr(w, http.StatusBadGateway, msg)
+		return
+	}
+	if err := s.st.DeleteServer(serverID); err != nil {
+		writeErr(w, http.StatusInternalServerError, "store: "+err.Error())
+		return
+	}
+	s.st.Audit(userFromRequest(r), "server_delete", serverID, sv.Name)
+	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": "true"})
+}
+
 // nodeHost extracts the hostname/IP from a node URL (http://10.0.0.1:8080).
 func nodeHost(raw string) string {
 	u, err := url.Parse(raw)

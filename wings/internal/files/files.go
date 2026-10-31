@@ -51,6 +51,15 @@ func Wipe(dataDir, serverID string) error {
 	return nil
 }
 
+// Destroy removes the server's entire directory (files + config.json +
+// anything else under servers/<serverID>) — the server deletion path.
+// ServerID comes from the panel URL and root is always <dataDir>/servers/<id>,
+// so this can never touch anything outside a server dir.
+func Destroy(dataDir, serverID string) error {
+	root := filepath.Join(dataDir, "servers", serverID)
+	return os.RemoveAll(root)
+}
+
 // Resolve validates server-relative rel against the server's files root and
 // returns the absolute path. Used by the SFTP server for the same
 // escape-proofing the HTTP file manager relies on.

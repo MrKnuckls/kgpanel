@@ -338,3 +338,15 @@ func (c *Client) Reinstall(n *store.Node, serverID string, wipeFiles bool) error
 	defer resp.Body.Close()
 	return nil
 }
+
+// Destroy permanently deletes the server on wings: container, files+config
+// dir, and the provisioned database/user if any. The panel record is removed
+// separately store-side.
+func (c *Client) Destroy(n *store.Node, serverID string) error {
+	resp, err := c.do(n, http.MethodPost, "/v1/servers/"+serverID+"/destroy", nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
+}

@@ -336,6 +336,40 @@ func Handler(token, dataDir, hostDataDir, updateURL string, reg *metrics.Registr
 		})
 	})
 
+	// destroy: permanent server deletion. Removes the container, the server's
+	// files + config dir, its database/user if provisioned, and its schedule
+	// config is kept server-side in the panel (wings only knows files+db).
+	// POST /v1/servers/{id}/destroy
+	mux.HandleFunc("/v1/servers/{id}/destroy", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			httpError(w, http.StatusMethodNotAllowed, "POST only")
+			return
+		}
+		if !checkAuth(w, r, token) {
+			return
+		}
+		serverID := r.PathValue("id")
+		ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
+		defer cancel()
+		// read the spec FIRST (files.Destroy removes config.json too)
+		sp, err := srvconfig.Load(dataDir, serverID)
+		hadDB := err == nil && sp.DB
+		_ = docker.Remove(ctx, serverID) // container may already be gone
+		if err := files.Destroy(dataDir, serverID); err != nil {
+			httpError(w, http.StatusBadGateway, "files: "+err.Error())
+			return
+		}
+		// drop the provisioned DB/user if this server used one (idempotent)
+		if hadDB {
+			m := db.NewManager(dataDir)
+			if derr := m.Drop(ctx, serverID); derr != nil {
+				httpError(w, http.StatusBadGateway, "db: "+derr.Error())
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
+	})
+
 	// health
 	mux.HandleFunc("/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "data": dataDir, "version": version.Version})
