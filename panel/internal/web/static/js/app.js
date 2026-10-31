@@ -727,24 +727,29 @@ $("adminBtn").addEventListener("click", () => { $("admin").style.display = "flex
 let updPoll = null;
 async function loadUpdates() {
   const el = $("updStatus"); el.textContent = "checking…";
+  let checkTxt = "";
   try {
     const d = await jfetch("/update/check");
     const cur = d.current.replace(/^v/, ""), lat = d.latest.replace(/^v/, "");
-    el.textContent = d.update_needed ? `v${cur} → v${lat} — update available` : `up to date (v${cur})`;
-  } catch (e) { el.textContent = "feed unreachable — " + e.message; }
+    checkTxt = d.update_needed ? `update available: v${cur} → v${lat}` : `up to date — current v${cur} · latest release v${lat}`;
+  } catch (e) { checkTxt = "feed unreachable — " + e.message; }
   try {
     const st = await jfetch("/update/status");
     if (st.mode === "wings-docker") {
       if (st.running) {
         el.textContent = "updating via wings… building + swapping the panel container (this takes a minute or two)";
         pollUpdateStatus();
+        return;
       } else if (st.last_ok) {
-        el.textContent = "last update: ok" + (st.last_tag ? " (v" + st.last_tag.replace(/^v/, "") + ")" : "") + " — panel restarted on the new image";
+        el.textContent = checkTxt + " — last update: ok" + (st.last_tag ? " (v" + st.last_tag.replace(/^v/, "") + ")" : "") + " — panel restarted on the new image";
+        return;
       } else if (st.last_error) {
-        el.textContent = "last update failed: " + st.last_error;
+        el.textContent = checkTxt + " — last update failed: " + st.last_error;
+        return;
       }
     }
   } catch (e) { /* bare-metal: no wings status */ }
+  el.textContent = checkTxt;
 }
 async function pollUpdateStatus() {
   clearInterval(updPoll);
