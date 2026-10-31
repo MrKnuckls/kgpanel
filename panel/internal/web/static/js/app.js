@@ -724,20 +724,61 @@ async function loadAudit() {
   $("auditTable").querySelector("tbody").innerHTML = d.audit.map((a) => `<tr><td class="mono">${new Date(a.time).toLocaleString()}</td><td>${esc(a.actor)}</td><td>${esc(a.action)}</td><td class="mono">${esc(a.target)}</td></tr>`).join("");
 }
 $("adminBtn").addEventListener("click", () => { $("admin").style.display = "flex"; loadNodes(); loadEggs(); loadAudit(); loadUpdates(); });
+let updPoll = null;
 async function loadUpdates() {
   const el = $("updStatus"); el.textContent = "checking…";
   try {
     const d = await jfetch("/update/check");
     const cur = d.current.replace(/^v/, ""), lat = d.latest.replace(/^v/, "");
-    el.textContent = d.update_needed ? `v${cur} → v${lat} (${d.asset}) — update available` : `up to date (v${cur})`;
+    el.textContent = d.update_needed ? `v${cur} → v${lat} — update available` : `up to date (v${cur})`;
   } catch (e) { el.textContent = "feed unreachable — " + e.message; }
+  try {
+    const st = await jfetch("/update/status");
+    if (st.mode === "wings-docker") {
+      if (st.running) {
+        el.textContent = "updating via wings… building + swapping the panel container (this takes a minute or two)";
+        pollUpdateStatus();
+      } else if (st.last_ok) {
+        el.textContent = "last update: ok" + (st.last_tag ? " (v" + st.last_tag.replace(/^v/, "") + ")" : "") + " — panel restarted on the new image";
+      } else if (st.last_error) {
+        el.textContent = "last update failed: " + st.last_error;
+      }
+    }
+  } catch (e) { /* bare-metal: no wings status */ }
+}
+async function pollUpdateStatus() {
+  clearInterval(updPoll);
+  updPoll = setInterval(async () => {
+    try {
+      const st = await jfetch("/update/status");
+      if (!st.running) {
+        clearInterval(updPoll);
+        const el = $("updStatus");
+        el.textContent = st.last_ok ? "update finished ✓ — panel restarted on the new image" : "update failed: " + (st.last_error || "unknown error");
+        loadUpdates();
+      } else {
+        $("updStatus").textContent = "updating via wings… " + (st.last_tag ? "v" + st.last_tag.replace(/^v/, "") : "") + " (this can take a couple minutes)";
+      }
+    } catch (e) { /* panel may be restarting — keep polling */ }
+  }, 4000);
 }
 $("updCheck").addEventListener("click", loadUpdates);
 $("updApply").addEventListener("click", async () => {
-  if (!confirm("apply update? the panel will swap its binary and restart.")) return;
-  const el = $("updStatus"); el.textContent = "downloading…";
-  try { const d = await jfetch("/update", { method: "POST" }); el.textContent = d.message || "done"; }
-  catch (e) { el.textContent = "update failed — " + e.message; }
+  if (!confirm("apply the update? wings will download the release, rebuild the panel image, and recreate the panel container — the panel restarts and you may briefly lose this page.")) return;
+  const el = $("updStatus"); el.textContent = "starting update — waiting for wings…";
+  try {
+    const d = await jfetch("/update", { method: "POST" });
+    el.textContent = d.mode === "wings-docker" ? "update started via wings ✓" : (d.message || "done");
+    pollUpdateStatus();
+  } catch (e) { el.textContent = "update failed — " + e.message; }
+});
+$("updRollback").addEventListener("click", async () => {
+  if (!confirm("roll back to the previous panel image? the container is recreated from the -previous snapshot taken before the last update.")) return;
+  const el = $("updStatus"); el.textContent = "rolling back — swapping container…";
+  try {
+    await jfetch("/rollback", { method: "POST" });
+    el.textContent = "rollback started ✓ — panel will restart on the previous image";
+  } catch (e) { el.textContent = "rollback failed — " + e.message; }
 });
 $("logout").addEventListener("click", () => { localStorage.removeItem("kg_token"); document.cookie = "kg_token=; path=/; Max-Age=0"; location.href = "/login.html"; });
 ["create", "admin"].forEach((id) => $(id).addEventListener("click", (ev) => { if (ev.target === $(id)) $(id).style.display = "none"; }));

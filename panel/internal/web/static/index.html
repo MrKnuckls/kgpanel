@@ -6,7 +6,7 @@
 <title>KGPanel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/kg.css?v=20261101e">
+<link rel="stylesheet" href="/css/kg.css?v=20261101f">
 </head>
 <body>
 <div class="shell">
@@ -369,8 +369,9 @@
       <div class="row" style="gap:8px">
         <button class="btn" id="updCheck">check for update</button>
         <button class="btn primary" id="updApply">apply update</button>
+        <button class="btn" id="updRollback" style="border-color:rgba(255,176,0,.5);color:var(--gold,#ffb000)">⇦ rollback</button>
       </div>
-      <p style="margin-top:10px;color:var(--muted,#8b949e);font-size:12px">releases are published from GitHub — the panel downloads the binary for its platform, verifies the checksum, swaps itself and restarts. keep this page open a few seconds after applying.</p>
+      <p style="margin-top:10px;color:var(--muted,#8b949e);font-size:12px">on this install the update is applied through wings: it downloads the new release source, builds the panel image, snapshots the current image as <span class="mono">-previous</span>, then recreates the panel container with your same settings — the container restart is what makes the new version live. rollback swaps the container back to the <span class="mono">-previous</span> image. keep this page open; it may disconnect while the panel restarts.</p>
     </div>
     <div id="tab-audit" class="tab" style="display:none">
       <table id="auditTable"><thead><tr><th>time</th><th>actor</th><th>action</th><th>target</th></tr></thead><tbody></tbody></table>
@@ -378,6 +379,6 @@
   </div>
 </div>
 
-<script src="/js/app.js?v=20261101e"></script>
+<script src="/js/app.js?v=20261101f"></script>
 </body>
 </html>

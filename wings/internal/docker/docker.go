@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -126,6 +127,151 @@ func Recreate(ctx context.Context, hostDataDir, serverID, image string, env map[
 func Remove(ctx context.Context, serverID string) error {
 	name := ContainerName(serverID)
 	if _, err := run(ctx, "rm", "-f", name); err != nil {
+		return err
+	}
+	return nil
+}
+
+// TagImage tags an existing image (docker tag src dst). Used to snapshot the
+// running panel image as kgpanel:previous before an update so rollback can
+// recreate the container from it.
+func TagImage(ctx context.Context, src, dst string) error {
+	if _, err := run(ctx, "tag", src, dst); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ImageExists reports whether the local daemon has the named image.
+func ImageExists(ctx context.Context, image string) bool {
+	_, err := run(ctx, "image", "inspect", image)
+	return err == nil
+}
+
+// BuildImage builds from a local context dir with the given Dockerfile-relative
+// path, passing VERSION as a build arg. contextDir must be visible to the
+// docker daemon (i.e. under hostDataDir when wings runs in a container).
+func BuildImage(ctx context.Context, contextDir, dockerfileRel, image, version string) error {
+	args := []string{"build", "--build-arg", "VERSION=" + version, "-f", filepath.Join(contextDir, dockerfileRel), "-t", image, contextDir}
+	if _, err := run(ctx, args...); err != nil {
+		return err
+	}
+	return nil
+}
+
+// PanelImage returns the image ref a container was created from
+// (.Config.Image from docker inspect). Used to know what to tag as -previous
+// and what the rollback target should be.
+func PanelImage(ctx context.Context, container string) (string, error) {
+	out, err := run(ctx, "inspect", "-f", "{{.Config.Image}}", container)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
+// PanelInspect captures the bits docker run needs to recreate a container with
+// the same settings: env (all of it — including the panel secret, so it is
+// preserved across an update without the secret ever being parsed), bind
+// mounts, published ports and restart policy.
+func PanelInspect(ctx context.Context, container string) (Env []string, MountArgs, PortArgs []string, Restart string, RetryCount int, NetworkMode string, err error) {
+	out, err := run(ctx, "inspect", container)
+	if err != nil {
+		return nil, nil, nil, "", 0, "", err
+	}
+	var ins []struct {
+		Config struct {
+			Env []string `json:"Env"`
+		} `json:"Config"`
+		HostConfig struct {
+			PortBindings map[string][]struct {
+				HostIP   string `json:"HostIp"`
+				HostPort string `json:"HostPort"`
+			} `json:"PortBindings"`
+			RestartPolicy struct {
+				Name              string `json:"Name"`
+				MaximumRetryCount int    `json:"MaximumRetryCount"`
+			} `json:"RestartPolicy"`
+			NetworkMode string `json:"NetworkMode"`
+		} `json:"HostConfig"`
+		Mounts []struct {
+			Type        string `json:"Type"`
+			Source      string `json:"Source"`
+			Destination string `json:"Destination"`
+			RW          bool   `json:"RW"`
+		} `json:"Mounts"`
+	}
+	if err := json.Unmarshal([]byte(out), &ins); err != nil || len(ins) == 0 {
+		return nil, nil, nil, "", 0, "", fmt.Errorf("bad docker inspect for %s: %w", container, err)
+	}
+	c := ins[0]
+	// only explicit (non-created-by-docker) env is needed; docker injects
+	// PATH/HOSTNAME itself. Keep everything else so secrets+config survive.
+	skip := map[string]bool{"PATH": true, "HOSTNAME": true, "HOME": true}
+	for _, e := range c.Config.Env {
+		k := strings.SplitN(e, "=", 2)[0]
+		if !skip[k] {
+			Env = append(Env, e)
+		}
+	}
+	for _, m := range c.Mounts {
+		if m.Type != "bind" || m.Source == "" {
+			continue
+		}
+		arg := m.Source + ":" + m.Destination
+		if !m.RW {
+			arg += ":ro"
+		}
+		MountArgs = append(MountArgs, arg)
+	}
+	for cport, binds := range c.HostConfig.PortBindings {
+		for _, b := range binds {
+			hp := b.HostPort
+			if b.HostIP != "" && b.HostIP != "0.0.0.0" && b.HostIP != "::" {
+				hp = b.HostIP + ":" + hp
+			}
+			arg := hp + ":" + cport
+			PortArgs = append(PortArgs, arg)
+		}
+	}
+	return Env, MountArgs, PortArgs, c.HostConfig.RestartPolicy.Name, c.HostConfig.RestartPolicy.MaximumRetryCount, c.HostConfig.NetworkMode, nil
+}
+
+// RecreatePanelContainer swaps the panel container to the given image,
+// preserving env, mounts, ports, network and restart policy from the CURRENT
+// container. The old container is removed first (docker rm -f), then a fresh
+// one is created and started with the same settings — the container recreation
+// is what makes the new image actually take effect.
+func RecreatePanelContainer(ctx context.Context, container, image string) error {
+	env, mounts, ports, restart, retries, netmode, err := PanelInspect(ctx, container)
+	if err != nil {
+		return err
+	}
+	if _, err := run(ctx, "rm", "-f", container); err != nil {
+		return err
+	}
+	args := []string{"run", "-d", "--name", container}
+	if restart != "" {
+		r := "--restart=" + restart
+		if restart == "on-failure" && retries > 0 {
+			r = fmt.Sprintf("--restart=on-failure:%d", retries)
+		}
+		args = append(args, r)
+	}
+	if netmode != "" && netmode != "default" {
+		args = append(args, "--network", netmode)
+	}
+	for _, m := range mounts {
+		args = append(args, "-v", m)
+	}
+	for _, p := range ports {
+		args = append(args, "-p", p)
+	}
+	for _, e := range env {
+		args = append(args, "-e", e)
+	}
+	args = append(args, image)
+	if _, err := run(ctx, args...); err != nil {
 		return err
 	}
 	return nil

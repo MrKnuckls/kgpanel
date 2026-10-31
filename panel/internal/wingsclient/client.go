@@ -107,6 +107,78 @@ func (c *Client) ConsoleURL(n *store.Node, serverID string) string {
 	return "ws" + base[4:] + "/v1/servers/" + serverID + "/console"
 }
 
+// PanelUpdate asks the node's wings to rebuild + recreate the panel container
+// from the release source for the given tag (empty = latest). The call returns
+// once wings acknowledges; the build+swap runs on wings in the background
+// (the panel container itself goes down and comes back on the new image).
+func (c *Client) PanelUpdate(n *store.Node, tag string) error {
+	body, _ := json.Marshal(map[string]string{"tag": tag})
+	req, err := http.NewRequest(http.MethodPost, n.URL+"/v1/panel/update", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-KG-Token", n.Token)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("wings unreachable: %w", err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("wings %s: %s", resp.Status, string(b))
+	}
+	return nil
+}
+
+// PanelRollback asks wings to recreate the panel container from the
+// <image>-previous snapshot taken before the last update.
+func (c *Client) PanelRollback(n *store.Node) error {
+	req, err := http.NewRequest(http.MethodPost, n.URL+"/v1/panel/rollback", nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("X-KG-Token", n.Token)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("wings unreachable: %w", err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("wings %s: %s", resp.Status, string(b))
+	}
+	return nil
+}
+
+// PanelUpdateStatus asks wings whether a panel update is running and the
+// outcome of the last one — lets the UI show progress and errors.
+func (c *Client) PanelUpdateStatus(n *store.Node) (running, ok bool, tag, errMsg string, err error) {
+	req, err := http.NewRequest(http.MethodGet, n.URL+"/v1/panel/update/status", nil)
+	if err != nil {
+		return false, false, "", "", err
+	}
+	req.Header.Set("X-KG-Token", n.Token)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return false, false, "", "", fmt.Errorf("wings unreachable: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return false, false, "", "", fmt.Errorf("wings %s", resp.Status)
+	}
+	var out struct {
+		Running bool   `json:"running"`
+		LastOK  bool   `json:"last_ok"`
+		LastErr string `json:"last_error"`
+		LastTag string `json:"last_tag"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return false, false, "", "", fmt.Errorf("bad wings response: %w", err)
+	}
+	return out.Running, out.LastOK, out.LastTag, out.LastErr, nil
+}
+
 // do performs an authenticated request to a wings endpoint and returns the
 // raw response for streaming (must be closed by caller).
 func (c *Client) do(n *store.Node, method, path string, body io.Reader) (*http.Response, error) {

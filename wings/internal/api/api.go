@@ -185,6 +185,27 @@ func Handler(token, dataDir, hostDataDir, updateURL string, reg *metrics.Registr
 		st, _ := update.Latest(updateURL)
 		writeJSON(w, http.StatusOK, st)
 	})
+
+	// panel update/rollback: wings rebuilds + recreates the panel container
+	// (wings has the docker socket; the panel container does not).
+	mux.HandleFunc("/v1/panel/update", func(w http.ResponseWriter, r *http.Request) {
+		if !checkAuth(w, r, token) {
+			return
+		}
+		handlePanelUpdate(dataDir, hostDataDir, updateURL)(w, r)
+	})
+	mux.HandleFunc("/v1/panel/rollback", func(w http.ResponseWriter, r *http.Request) {
+		if !checkAuth(w, r, token) {
+			return
+		}
+		handlePanelRollback()(w, r)
+	})
+	mux.HandleFunc("/v1/panel/update/status", func(w http.ResponseWriter, r *http.Request) {
+		if !checkAuth(w, r, token) {
+			return
+		}
+		handlePanelUpdateStatus()(w, r)
+	})
 	mux.HandleFunc("/v1/update", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			httpError(w, http.StatusMethodNotAllowed, "POST only")

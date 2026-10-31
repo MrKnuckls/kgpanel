@@ -61,7 +61,9 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.Handle("/api/servers/{id}/reinstall", s.auth(s.perm("control", http.HandlerFunc(s.handleServerReinstall))))
 	mux.Handle("/api/audit", s.auth(http.HandlerFunc(s.handleAudit)))
 	mux.Handle("/api/update/check", s.auth(http.HandlerFunc(s.handleUpdateCheck)))
+	mux.Handle("/api/update/status", s.auth(http.HandlerFunc(s.handleUpdateStatus)))
 	mux.Handle("/api/update", s.auth(http.HandlerFunc(s.handleUpdate)))
+	mux.Handle("/api/rollback", s.auth(http.HandlerFunc(s.handleRollback)))
 
 	// websocket console proxy: browser -> panel -> wings
 	mux.Handle("/api/console/{id}", s.auth(nhooyr.Handler(s.handleConsoleProxy)))
