@@ -414,7 +414,7 @@ async function loadUsers() {
 $("uAdd").addEventListener("click", async () => {
   const name = $("uName").value.trim(), perm = $("uPerm").value;
   if (!name) { alert("enter a username"); return; }
-  try { await jfetch("/servers/" + currentServer + "/users/create", { method: "POST", body: JSON.stringify({ username: name, permission: perm }) }); $("uName").value = ""; loadUsers(); } catch (e) { alert(e.message); }
+  try { await jfetch("/servers/" + currentServer + "/users/create", { method: "POST", body: JSON.stringify({ username: name, password: $("uPass").value, permission: perm }) }); $("uName").value = ""; $("uPass").value = ""; loadUsers(); } catch (e) { alert(e.message); }
 });
 
 /* ---------- network (allocations) ---------- */

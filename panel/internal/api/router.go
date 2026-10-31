@@ -1,7 +1,9 @@
 package api
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -178,8 +180,10 @@ func (s *Server) handleConsoleProxy(ws *nhooyr.Conn) {
 	// Connect to wings with the node token via query param (wings reads header
 	// or query; our proxy passes the node token, never the user token).
 	client := wingsclient.New()
-	up, err := nhooyr.Dial(client.ConsoleURL(n, serverID)+"?token="+n.Token, "", client.ConsoleURL(n, serverID))
+	dialURL := client.ConsoleURL(n, serverID) + "?token=" + n.Token
+	up, err := nhooyr.Dial(dialURL, "", client.ConsoleURL(n, serverID))
 	if err != nil {
+		log.Printf("console %s: wings dial failed (%s): %v", serverID, shortenToken(n.Token), err)
 		_ = ws.Close()
 		return
 	}
@@ -209,4 +213,14 @@ func (s *Server) handleConsoleProxy(ws *nhooyr.Conn) {
 			return
 		}
 	}
+}
+
+// shortenToken returns a hash-safe prefix for log correlation: length + SHA-256
+// hash prefix. Never logs the token value itself.
+func shortenToken(t string) string {
+	if t == "" {
+		return "len=0"
+	}
+	sum := sha256.Sum256([]byte(t))
+	return fmt.Sprintf("len=%d sha256=%.16x", len(t), sum[:8])
 }
