@@ -36,6 +36,9 @@ type ServerSpec struct {
 	CPUPercent int               `json:"cpu_percent"`
 	Network    string            `json:"network,omitempty"`
 	DB         bool              `json:"db,omitempty"`
+	// SFTPPassword is the per-server SFTP password wings stores with the spec
+	// and checks at SSH login (username = serverID).
+	SFTPPassword string `json:"sftp_password,omitempty"`
 	Recreate   bool              `json:"recreate,omitempty"`
 }
 
@@ -243,6 +246,20 @@ func (c *Client) BackupDownload(n *store.Node, serverID, name string) (*http.Res
 func (c *Client) BackupAction(n *store.Node, serverID, action, name string) error {
 	body, _ := json.Marshal(map[string]string{"name": name})
 	resp, err := c.do(n, http.MethodPost, "/v1/servers/"+serverID+"/backups/"+action, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
+}
+
+// Reinstall asks wings to destroy the server's container and recreate it from
+// the stored egg spec. wipeFiles=true also clears the server's files dir
+// (fresh reinstall); false is the "repair" path — files stay, the container
+// is rebuilt and the install re-validates on next start.
+func (c *Client) Reinstall(n *store.Node, serverID string, wipeFiles bool) error {
+	body, _ := json.Marshal(map[string]bool{"wipe_files": wipeFiles})
+	resp, err := c.do(n, http.MethodPost, "/v1/servers/"+serverID+"/reinstall", bytes.NewReader(body))
 	if err != nil {
 		return err
 	}

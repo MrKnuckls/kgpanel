@@ -25,6 +25,9 @@ type Spec struct {
 	// DB requests a per-server database on the node's shared MariaDB; wings
 	// provisions DB+user and injects KG_DB_* env vars into the container.
 	DB bool `json:"db,omitempty"`
+	// SFTPPassword is the per-server SFTP login password (username = serverID).
+	// Set by the panel at server create / first SFTP-details fetch.
+	SFTPPassword string `json:"sftp_password,omitempty"`
 }
 
 func dir(dataDir, serverID string) string {

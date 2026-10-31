@@ -6,7 +6,7 @@
 <title>KGPanel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/kg.css?v=20261031b">
+<link rel="stylesheet" href="/css/kg.css?v=20261101a">
 </head>
 <body>
 <div class="shell">
@@ -50,7 +50,10 @@
       <div class="detail-head">
         <div class="row" style="gap:10px">
           <button class="icon-btn" id="backBtn" title="back">←</button>
-          <h2 id="dName" style="flex:1"></h2>
+          <div style="flex:1">
+            <h2 id="dName" style="margin:0"></h2>
+            <span id="dDesc" class="muted" style="font-size:12px"></span>
+          </div>
           <span id="dBadge" class="badge"><span class="dot"></span><span id="dState">—</span></span>
         </div>
         <div class="connect-box" id="connectBox" style="display:none">
@@ -164,6 +167,42 @@
             <div class="row" style="gap:8px">
               <button class="btn primary" id="setEggSave">save egg</button>
               <span id="setEggMsg" class="muted" style="font-size:12px"></span>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="padding:16px;margin-top:12px" data-perm="admin">
+          <h3 style="margin-bottom:12px">server details</h3>
+          <div class="settings-form">
+            <label>display name <input id="setName" maxlength="64"></label>
+            <label>description <input id="setDesc" maxlength="200"></label>
+            <div class="row" style="gap:8px">
+              <button class="btn primary" id="detailSave">save details</button>
+              <span id="detailMsg" class="muted" style="font-size:12px"></span>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="padding:16px;margin-top:12px" data-perm="control">
+          <h3 style="margin-bottom:12px">sftp access</h3>
+          <div class="settings-form">
+            <label>host <input id="sftpHost" readonly onclick="this.select()"></label>
+            <label>port <input id="sftpPort" readonly onclick="this.select()"></label>
+            <label>username <input id="sftpUser" readonly onclick="this.select()"></label>
+            <label>password <input id="sftpPass" readonly onclick="this.select()"></label>
+            <p class="muted" style="font-size:12px;margin:6px 0 10px">wings runs a built-in SFTP server on port 2022. you're chrooted to this server's files folder (root = files). use any SSH/SFTP client, e.g. FileZilla / WinSCP: sftp://host:2022</p>
+            <div class="row" style="gap:8px">
+              <button class="btn primary" id="sftpReveal" onclick="loadSftp()">show details</button>
+              <span id="sftpMsg" class="muted" style="font-size:12px"></span>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="padding:16px;margin-top:12px;border-color:rgba(255,176,0,.35)" data-perm="control">
+          <h3 style="margin-bottom:12px">danger zone</h3>
+          <div class="settings-form">
+            <p class="muted" style="font-size:12px;margin:0 0 10px"><b>repair</b> rebuilds the docker container from this server's egg but keeps all files & saves — use when the container is broken, corrupted, or won't start. <b>reinstall</b> deletes the container <i>and wipes all files</i> — a fresh install of the server.</p>
+            <div class="row" style="gap:8px;flex-wrap:wrap">
+              <button class="btn" id="repairBtn">repair server</button>
+              <button class="btn" id="reinstallBtn" style="border-color:rgba(255,80,80,.5);color:#ff6b6b">reinstall server (wipes files)</button>
+              <span id="dangerMsg" class="muted" style="font-size:12px"></span>
             </div>
           </div>
         </div>
@@ -295,6 +334,6 @@
   </div>
 </div>
 
-<script src="/js/app.js?v=20261031b"></script>
+<script src="/js/app.js?v=20261101a"></script>
 </body>
 </html>

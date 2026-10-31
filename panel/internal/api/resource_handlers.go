@@ -87,7 +87,11 @@ func (s *Server) handleServers(w http.ResponseWriter, r *http.Request) {
 		if isSub && s.st.SubUserPerm(sv.ID, uname) == "" {
 			continue
 		}
-		rw := row{Server: sv}
+		// never ship credential material in listings; /sftp is the only
+		// endpoint that reveals it (and it's permission-gated)
+		copy := *sv
+		copy.SFTPPassword = ""
+		rw := row{Server: &copy}
 		if n := s.st.GetNode(sv.NodeID); n != nil {
 			rw.NodeName = n.Name
 			rw.NodeURL = n.URL
@@ -140,16 +144,17 @@ func (s *Server) pushServerConfig(sv *store.Server, recreate bool) {
 		return
 	}
 	sp := wingsclient.ServerSpec{
-		Image:      egg.Image,
-		Startup:    egg.Startup,
-		StopCmd:    egg.StopCommand,
-		Env:        sv.Env,
-		Ports:      sv.Ports,
-		MemoryMB:   sv.MemoryMB,
-		CPUPercent: sv.CPUPercent,
-		Network:    egg.Network,
-		DB:         egg.DB,
-		Recreate:   recreate,
+		Image:        egg.Image,
+		Startup:      egg.Startup,
+		StopCmd:      egg.StopCommand,
+		Env:          sv.Env,
+		Ports:        sv.Ports,
+		MemoryMB:     sv.MemoryMB,
+		CPUPercent:   sv.CPUPercent,
+		Network:      egg.Network,
+		DB:           egg.DB,
+		SFTPPassword: sv.SFTPPassword,
+		Recreate:     recreate,
 	}
 	if err := s.wings.ServerConfig(n, sv.ID, sp); err != nil {
 		log.Printf("pushServerConfig %s: %v", sv.Name, err)

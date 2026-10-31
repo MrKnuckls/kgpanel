@@ -30,6 +30,38 @@ func Root(dataDir, serverID string) (string, error) {
 	return root, nil
 }
 
+// Wipe removes everything under the server's files root (reinstall path).
+// The root itself stays; only contents go. ServerID comes from the panel's
+// URL path, and root is always <dataDir>/servers/<id>/files, so this can
+// never touch anything outside a server dir.
+func Wipe(dataDir, serverID string) error {
+	root, err := Root(dataDir, serverID)
+	if err != nil {
+		return err
+	}
+	des, err := os.ReadDir(root)
+	if err != nil {
+		return err
+	}
+	for _, de := range des {
+		if err := os.RemoveAll(filepath.Join(root, de.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Resolve validates server-relative rel against the server's files root and
+// returns the absolute path. Used by the SFTP server for the same
+// escape-proofing the HTTP file manager relies on.
+func Resolve(dataDir, serverID, rel string) (string, error) {
+	root, err := Root(dataDir, serverID)
+	if err != nil {
+		return "", err
+	}
+	return safePath(root, rel)
+}
+
 // safePath resolves rel (server-relative, e.g. "/worlds/x.dat") inside root
 // and rejects anything that escapes. Empty/"/" => root itself.
 func safePath(root, rel string) (string, error) {

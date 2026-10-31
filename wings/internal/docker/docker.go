@@ -121,6 +121,16 @@ func Recreate(ctx context.Context, hostDataDir, serverID, image string, env map[
 	return nil
 }
 
+// Remove force-removes the server's container (if present). Used by reinstall
+// to get a clean slate before re-creating from the egg spec.
+func Remove(ctx context.Context, serverID string) error {
+	name := ContainerName(serverID)
+	if _, err := run(ctx, "rm", "-f", name); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Power maps a panel signal to docker.
 func Power(ctx context.Context, serverID, signal string, stopTimeout int) error {
 	name := ContainerName(serverID)

@@ -56,18 +56,20 @@ type SubUser struct {
 }
 
 type Server struct {
-	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	OwnerID     string            `json:"owner_id"`
-	NodeID      string            `json:"node_id"`
-	EggID       string            `json:"egg_id"`
-	MemoryMB    int               `json:"memory_mb"`
-	CPUPercent  int               `json:"cpu_percent"`
-	Ports       []string          `json:"ports"`
-	Env         map[string]string `json:"env"`
-	SubUsers    []SubUser         `json:"sub_users,omitempty"`
-	ContainerID string            `json:"container_id,omitempty"`
-	CreatedAt   time.Time         `json:"created_at"`
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	Description  string            `json:"description,omitempty"`
+	OwnerID      string            `json:"owner_id"`
+	NodeID       string            `json:"node_id"`
+	EggID        string            `json:"egg_id"`
+	MemoryMB     int               `json:"memory_mb"`
+	CPUPercent   int               `json:"cpu_percent"`
+	Ports        []string          `json:"ports"`
+	Env          map[string]string `json:"env"`
+	SubUsers     []SubUser         `json:"sub_users,omitempty"`
+	SFTPPassword string            `json:"sftp_password,omitempty"`
+	ContainerID  string            `json:"container_id,omitempty"`
+	CreatedAt    time.Time         `json:"created_at"`
 }
 
 type Schedule struct {
@@ -377,6 +379,50 @@ func (s *Store) ListSubUsersFor(serverID string) []SubUser {
 	out := make([]SubUser, len(sv.SubUsers))
 	copy(out, sv.SubUsers)
 	return out
+}
+
+// UpdateServerDetails updates the display name and/or description. Empty
+// fields are left unchanged (callers send only what they edit).
+func (s *Store) UpdateServerDetails(serverID, name, desc string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sv, ok := s.servers[serverID]
+	if !ok {
+		return fmt.Errorf("server %s not found", serverID)
+	}
+	if name != "" {
+		sv.Name = name
+	}
+	if desc != "" {
+		sv.Description = desc
+	}
+	return s.save("servers.json", s.servers)
+}
+
+// EnsureSFTPPassword returns the server's SFTP password, generating + saving
+// one on first call (existing servers created before the feature get one
+// lazily). Never serialized to the browser except via the /sftp endpoint.
+func (s *Store) EnsureSFTPPassword(serverID string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sv, ok := s.servers[serverID]
+	if !ok {
+		return "", fmt.Errorf("server %s not found", serverID)
+	}
+	if sv.SFTPPassword == "" {
+		sv.SFTPPassword = randomPassword(16)
+		if err := s.save("servers.json", s.servers); err != nil {
+			return "", err
+		}
+	}
+	return sv.SFTPPassword, nil
+}
+
+// randomPassword returns a URL-safe random string of n bytes (base64ish).
+func randomPassword(n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)[:n]
 }
 
 // AuditForServer returns the most recent audit entries targeting this server.

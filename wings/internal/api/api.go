@@ -13,6 +13,7 @@ import (
 
 	"kgpanel/wings/internal/db"
 	"kgpanel/wings/internal/docker"
+	"kgpanel/wings/internal/files"
 	"kgpanel/wings/internal/metrics"
 	"kgpanel/wings/internal/srvconfig"
 	"kgpanel/wings/internal/update"
@@ -262,6 +263,56 @@ func Handler(token, dataDir, hostDataDir, updateURL string, reg *metrics.Registr
 			return
 		}
 		handleBackupsDelete(w, r, dataDir)
+	})
+
+	// reinstall: POST /v1/servers/{id}/reinstall {wipe_files:bool}
+	// Destroys the container and (optionally) wipes the server's files, then
+	// re-creates the container from the stored egg spec. Keep files = the
+	// "repair" path (re-validates the install on next start without losing
+	// configs/saves); wipe files = a true fresh reinstall.
+	mux.HandleFunc("/v1/servers/{id}/reinstall", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			httpError(w, http.StatusMethodNotAllowed, "POST only")
+			return
+		}
+		if !checkAuth(w, r, token) {
+			return
+		}
+		serverID := r.PathValue("id")
+		var in struct {
+			WipeFiles bool `json:"wipe_files"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&in)
+		sp, err := srvconfig.Load(dataDir, serverID)
+		if err != nil {
+			httpError(w, http.StatusNotFound, "no config for server (create it from the panel first)")
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 180*time.Second)
+		defer cancel()
+		// tear down the old container
+		_ = docker.Remove(ctx, serverID)
+		if in.WipeFiles {
+			if err := files.Wipe(dataDir, serverID); err != nil {
+				httpError(w, http.StatusBadGateway, err.Error())
+				return
+			}
+		}
+		// provision DB (idempotent) then rebuild the container from the spec
+		env := sp.Env
+		if sp.DB {
+			if env, err = provisionDB(ctx, dataDir, serverID, env); err != nil {
+				httpError(w, http.StatusBadGateway, err.Error())
+				return
+			}
+		}
+		if _, err := docker.EnsureExists(ctx, hostDataDir, serverID, sp.Image, env, sp.Ports, sp.MemoryMB, sp.CPUPercent, sp.Startup, sp.Network); err != nil {
+			httpError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"ok": "true", "wipe_files": in.WipeFiles,
+		})
 	})
 
 	// health

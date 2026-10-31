@@ -70,10 +70,14 @@ function applyPermUI() {
     if (b) b.style.display = on ? "" : "none";
   };
   showTab("users", canAdmin);
-  showTab("settings", canAdmin);
+  showTab("settings", canControl);
   showTab("databases", canControl);
   showTab("schedules", canControl);
   showTab("backups", canControl);
+  // settings-tab cards carry data-perm (details=admin, sftp/danger=control)
+  document.querySelectorAll("#dtab-settings .card[data-perm]").forEach((c) => {
+    c.style.display = hasPerm(c.dataset.perm) ? "" : "none";
+  });
   // hide the console command bar for view-only users
   const ti = document.querySelector(".term-input");
   if (ti) ti.style.display = canControl ? "" : "none";
@@ -179,7 +183,7 @@ async function refreshStatus() {
     setBadge(d.state);
     const dd = await jfetch("/servers");
     const sv = dd.servers.find((x) => x.id === currentServer);
-    if (sv) { $("dName").textContent = sv.name; $("dMeta").textContent = `${sv.memory_mb}MB · ${sv.cpu_percent}%`; }
+    if (sv) { $("dName").textContent = sv.name; $("dMeta").textContent = `${sv.memory_mb}MB · ${sv.cpu_percent}%`; $("dDesc").textContent = sv.description || ""; }
     showConnect(sv);
   } catch (e) { $("dState").textContent = "unreachable"; }
 }
@@ -491,6 +495,9 @@ async function loadSettings() {
     if (!sv) return;
     $("setMem").value = sv.memory_mb;
     $("setCpu").value = sv.cpu_percent;
+    $("setName").value = sv.name || "";
+    $("setDesc").value = sv.description || "";
+    $("detailMsg").textContent = "";
     // display just the container port (8211:8211/udp -> 8211/udp) so the field
     // reads cleanly; save normalizes it back to the explicit map form.
     $("setPorts").value = (sv.ports || []).map((p) => p.replace(/^.*?:/, "")).join(",");
@@ -553,6 +560,50 @@ $("setEggSave").addEventListener("click", async () => {
     $("setEggMsg").textContent = "egg saved.";
   } catch (e) { $("setEggMsg").textContent = "failed: " + e.message; }
 });
+
+/* ---------- settings: server details / sftp / danger zone ---------- */
+async function loadSftp() {
+  const msg = $("sftpMsg");
+  try {
+    msg.textContent = "loading…";
+    const d = await jfetch("/servers/" + currentServer + "/sftp");
+    $("sftpHost").value = d.host;
+    $("sftpPort").value = d.port;
+    $("sftpUser").value = d.username;
+    $("sftpPass").value = d.password;
+    msg.textContent = "copy the values into your SFTP client (FileZilla/WinSCP).";
+  } catch (e) { msg.textContent = "failed: " + e.message; }
+}
+$("detailSave").addEventListener("click", async () => {
+  const msg = $("detailMsg");
+  const name = $("setName").value.trim(), desc = $("setDesc").value.trim();
+  if (!name && !desc) { msg.textContent = "nothing to change."; return; }
+  try {
+    msg.textContent = "saving…";
+    await jfetch("/servers/" + currentServer + "/details", {
+      method: "POST",
+      body: JSON.stringify({ name, description: desc }),
+    });
+    msg.textContent = "details saved.";
+    refreshStatus();
+  } catch (e) { msg.textContent = "failed: " + e.message; }
+});
+async function dangerAction(wipe) {
+  if (!confirm(wipe
+    ? "REINSTALL " + currentServer + "?\n\nThis DELETES the container AND wipes ALL files — your saves and config are gone. A fresh copy is installed from the egg. This cannot be undone."
+    : "Repair " + currentServer + "?\n\nThe docker container is rebuilt from the egg. ALL files and saves are KEPT. Use this if the container is broken or won't start.")) return;
+  const msg = $("dangerMsg");
+  try {
+    msg.textContent = wipe ? "reinstalling…" : "repairing…";
+    await jfetch("/servers/" + currentServer + "/reinstall", {
+      method: "POST",
+      body: JSON.stringify({ wipe_files: wipe }),
+    });
+    msg.textContent = (wipe ? "reinstall started. files wiped — reinstall runs on next start." : "repair started. container rebuilt — start the server when ready.");
+  } catch (e) { msg.textContent = "failed: " + e.message; }
+}
+$("repairBtn").addEventListener("click", () => dangerAction(false));
+$("reinstallBtn").addEventListener("click", () => dangerAction(true));
 
 /* ---------- create modal ---------- */
 async function openCreate() {
