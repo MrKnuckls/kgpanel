@@ -315,11 +315,15 @@ func swapAndRestart(newBin string) error {
 			return err
 		}
 	} else {
-		if err := os.Rename(self, self+".old"); err != nil {
+		old := self + ".old"
+		// a previous update's .old may still exist — it's our own old version,
+		// safe to drop so updates don't accumulate
+		_ = os.Remove(old)
+		if err := os.Rename(self, old); err != nil {
 			return err
 		}
 		if err := os.Rename(tmp, self); err != nil {
-			os.Rename(self+".old", self) // roll back
+			os.Rename(old, self) // roll back
 			return err
 		}
 	}
