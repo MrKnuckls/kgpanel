@@ -74,8 +74,9 @@ function applyPermUI() {
   showTab("databases", canControl);
   showTab("schedules", canControl);
   showTab("backups", canControl);
-  // settings-tab cards carry data-perm (details=admin, sftp/danger=control)
-  document.querySelectorAll("#dtab-settings .card[data-perm]").forEach((c) => {
+  // settings-tab cards + header action buttons carry data-perm
+  // (details=admin, sftp/danger/repair/reinstall=control)
+  document.querySelectorAll("#dtab-settings .card[data-perm], .detail-head [data-perm]").forEach((c) => {
     c.style.display = hasPerm(c.dataset.perm) ? "" : "none";
   });
   // hide the console command bar for view-only users
@@ -604,6 +605,64 @@ async function dangerAction(wipe) {
 }
 $("repairBtn").addEventListener("click", () => dangerAction(false));
 $("reinstallBtn").addEventListener("click", () => dangerAction(true));
+
+/* ---------- header action buttons (SFTP / details / repair / reinstall) ---------- */
+function openModal(id) { $(id).style.display = "flex"; }
+function closeModal(id) { $(id).style.display = "none"; }
+$("hdSftp").addEventListener("click", async () => {
+  openModal("sftpModal");
+  try {
+    const d = await jfetch("/servers/" + currentServer + "/sftp");
+    $("mSftpHost").value = d.host;
+    $("mSftpPort").value = d.port;
+    $("mSftpUser").value = d.username;
+    $("mSftpPass").value = d.password;
+  } catch (e) {
+    $("mSftpPass").value = "failed: " + e.message;
+  }
+});
+$("mSftpClose").addEventListener("click", () => closeModal("sftpModal"));
+$("mSftpCopy").addEventListener("click", () => {
+  const txt = ["host: " + $("mSftpHost").value, "port: " + $("mSftpPort").value,
+    "username: " + $("mSftpUser").value, "password: " + $("mSftpPass").value].join("\n");
+  navigator.clipboard.writeText(txt).then(() => {
+    $("mSftpCopy").textContent = "copied ✓";
+    setTimeout(() => ($("mSftpCopy").textContent = "copy all"), 1500);
+  });
+});
+// clicking the dark backdrop closes the modal
+["sftpModal", "detailsModal"].forEach((id) => {
+  $(id).addEventListener("click", (e) => { if (e.target === $(id)) $(id).style.display = "none"; });
+});
+$("hdDetails").addEventListener("click", async () => {
+  openModal("detailsModal");
+  $("mDetailsMsg").textContent = "";
+  try {
+    const d = await jfetch("/servers");
+    const sv = d.servers.find((x) => x.id === currentServer);
+    // prefill rather than overwrite if user already typed something
+    if (!$("mName").value) $("mName").value = sv ? (sv.name || "") : "";
+    if (!$("mDesc").value) $("mDesc").value = sv ? (sv.description || "") : "";
+  } catch (e) { $("mDetailsMsg").textContent = e.message; }
+});
+$("mDetailsCancel").addEventListener("click", () => closeModal("detailsModal"));
+$("mDetailsSave").addEventListener("click", async () => {
+  const msg = $("mDetailsMsg");
+  const name = $("mName").value.trim(), desc = $("mDesc").value.trim();
+  if (!name && !desc) { msg.textContent = "nothing to change."; return; }
+  try {
+    msg.textContent = "saving…";
+    await jfetch("/servers/" + currentServer + "/details", {
+      method: "POST",
+      body: JSON.stringify({ name, description: desc }),
+    });
+    msg.textContent = "saved ✓";
+    closeModal("detailsModal");
+    refreshStatus();
+  } catch (e) { msg.textContent = "failed: " + e.message; }
+});
+$("hdRepair").addEventListener("click", () => dangerAction(false));
+$("hdReinstall").addEventListener("click", () => dangerAction(true));
 
 /* ---------- create modal ---------- */
 async function openCreate() {

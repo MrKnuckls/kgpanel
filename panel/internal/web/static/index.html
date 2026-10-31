@@ -6,7 +6,7 @@
 <title>KGPanel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/kg.css?v=20261101a">
+<link rel="stylesheet" href="/css/kg.css?v=20261101b">
 </head>
 <body>
 <div class="shell">
@@ -50,11 +50,17 @@
       <div class="detail-head">
         <div class="row" style="gap:10px">
           <button class="icon-btn" id="backBtn" title="back">←</button>
-          <div style="flex:1">
+          <div style="flex:1;min-width:0">
             <h2 id="dName" style="margin:0"></h2>
             <span id="dDesc" class="muted" style="font-size:12px"></span>
           </div>
           <span id="dBadge" class="badge"><span class="dot"></span><span id="dState">—</span></span>
+        </div>
+        <div class="row" style="gap:6px;justify-content:flex-end;margin-top:10px">
+          <button class="btn small" id="hdSftp" data-perm="control" title="SFTP credentials for this server">🔑 sftp</button>
+          <button class="btn small" id="hdDetails" data-perm="admin" title="change display name / description">✏️ details</button>
+          <button class="btn small" id="hdRepair" data-perm="control" title="rebuild container, keep all files">🔧 repair</button>
+          <button class="btn small" id="hdReinstall" data-perm="control" title="wipe files + fresh install" style="border-color:rgba(255,80,80,.5);color:#ff6b6b">🗑 reinstall</button>
         </div>
         <div class="connect-box" id="connectBox" style="display:none">
           <span class="connect-label">connect</span>
@@ -263,6 +269,40 @@
   </main>
 </div>
 
+<!-- sftp details modal -->
+<div id="sftpModal" class="modal" style="display:none">
+  <div class="modal-card card">
+    <h2 style="margin-bottom:14px">sftp access</h2>
+    <div class="settings-form">
+      <label>host <input id="mSftpHost" readonly onclick="this.select()"></label>
+      <label>port <input id="mSftpPort" readonly onclick="this.select()"></label>
+      <label>username <input id="mSftpUser" readonly onclick="this.select()"></label>
+      <label>password <input id="mSftpPass" readonly onclick="this.select()"></label>
+      <p class="muted" style="font-size:12px;margin:6px 0 10px">you're chrooted to this server's files folder. use FileZilla / WinSCP / any SFTP client: sftp://host:port</p>
+      <div class="row" style="gap:8px">
+        <button class="btn primary" id="mSftpClose">close</button>
+        <button class="btn" id="mSftpCopy">copy all</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- change server details modal -->
+<div id="detailsModal" class="modal" style="display:none">
+  <div class="modal-card card">
+    <h2 style="margin-bottom:14px">server details</h2>
+    <div class="settings-form">
+      <label>display name <input id="mName" maxlength="64"></label>
+      <label>description <input id="mDesc" maxlength="200"></label>
+      <div class="row" style="gap:8px">
+        <button class="btn primary" id="mDetailsSave">save</button>
+        <button class="btn" id="mDetailsCancel">cancel</button>
+        <span id="mDetailsMsg" class="muted" style="font-size:12px"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- create server modal -->
 <div id="create" class="modal" style="display:none">
   <div class="modal-card card">
@@ -334,6 +374,6 @@
   </div>
 </div>
 
-<script src="/js/app.js?v=20261101a"></script>
+<script src="/js/app.js?v=20261101b"></script>
 </body>
 </html>
