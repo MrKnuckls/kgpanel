@@ -145,6 +145,8 @@ async function refresh() {
   try {
     me = await jfetch("/me");
     $("whoami").textContent = me.username + (me.admin ? " · admin" : "");
+    const verEl = document.querySelector(".side-title .ver");
+    if (verEl && me.version) verEl.textContent = me.version;
     const isSub = !!me.subuser;
     // subusers don't manage nodes/eggs/updates or create servers
     $("adminBtn").style.display = isSub ? "none" : "";

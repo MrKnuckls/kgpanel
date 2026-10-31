@@ -9,6 +9,7 @@ import (
 	"kgpanel/panel/internal/auth"
 	"kgpanel/panel/internal/store"
 	"kgpanel/panel/internal/update"
+	"kgpanel/panel/internal/version"
 	"kgpanel/panel/internal/wingsclient"
 )
 
@@ -189,6 +190,7 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"id": uid, "username": uname, "admin": false, "subuser": true, "servers": servers,
+			"version": version.Version,
 		})
 		return
 	}
@@ -199,5 +201,6 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"id": u.ID, "username": u.Username, "admin": u.Admin, "created_at": u.CreatedAt,
+		"version": version.Version,
 	})
 }
