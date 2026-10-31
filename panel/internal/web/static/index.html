@@ -6,7 +6,7 @@
 <title>KGPanel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/kg.css?v=20261101b">
+<link rel="stylesheet" href="/css/kg.css?v=20261101c">
 </head>
 <body>
 <div class="shell">
@@ -83,18 +83,8 @@
         <div class="spark-card"><div class="spark-title">DISK</div><div class="spark-now mono" id="mDiskNow">—</div><svg class="spark-svg" id="mDiskSvg" viewBox="0 0 120 36"></svg></div>
       </div>
 
-      <div class="detail-tabs">
-        <button class="dtab active" data-tab="console">console</button>
-        <button class="dtab" data-tab="files">files</button>
-        <button class="dtab" data-tab="databases">databases</button>
-        <button class="dtab" data-tab="schedules">schedules</button>
-        <button class="dtab" data-tab="users">users</button>
-        <button class="dtab" data-tab="backups">backups</button>
-        <button class="dtab" data-tab="network">network</button>
-        <button class="dtab" data-tab="startup">startup</button>
-        <button class="dtab" data-tab="settings">settings</button>
-        <button class="dtab" data-tab="activity">activity</button>
-      </div>
+      <div class="detail-body">
+        <div class="detail-panes">
 
       <div id="dtab-console" class="dtab-pane">
         <div id="console" class="term">
@@ -265,6 +255,20 @@
       <div id="dtab-activity" class="dtab-pane" style="display:none">
         <table id="activityTable"><thead><tr><th>time</th><th>actor</th><th>action</th><th>detail</th></tr></thead><tbody></tbody></table>
       </div>
+        </div>
+        <div class="detail-tabs">
+          <button class="dtab active" data-tab="console">console</button>
+          <button class="dtab" data-tab="files">files</button>
+          <button class="dtab" data-tab="databases">databases</button>
+          <button class="dtab" data-tab="schedules">schedules</button>
+          <button class="dtab" data-tab="users">users</button>
+          <button class="dtab" data-tab="backups">backups</button>
+          <button class="dtab" data-tab="network">network</button>
+          <button class="dtab" data-tab="startup">startup</button>
+          <button class="dtab" data-tab="settings">settings</button>
+          <button class="dtab" data-tab="activity">activity</button>
+        </div>
+      </div>
     </div>
   </main>
 </div>
@@ -374,6 +378,6 @@
   </div>
 </div>
 
-<script src="/js/app.js?v=20261101b"></script>
+<script src="/js/app.js?v=20261101c"></script>
 </body>
 </html>
