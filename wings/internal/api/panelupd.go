@@ -123,6 +123,9 @@ func extractTarball(tarball, dest string) error {
 		if err != nil {
 			return err
 		}
+		if !strings.Contains(hdr.Name, "/") {
+			continue // top-level dir entry (kgpanel-<tag>/ itself)
+		}
 		rel := strings.SplitN(hdr.Name, "/", 2)[1] // strip kgpanel-<tag>/
 		if rel == "" {
 			continue
@@ -209,6 +212,10 @@ func runPanelUpdate(dataDir, hostData, feed, tag string) {
 	workRel := filepath.Join(updateWorkRel, strings.ReplaceAll(tag, "/", "_"))
 	tarball := filepath.Join(dataDir, workRel+".tar.gz")
 	extractDir := filepath.Join(dataDir, workRel)
+	if err := os.MkdirAll(filepath.Dir(tarball), 0o755); err != nil {
+		finish(false, fmt.Errorf("create update workdir: %w", err))
+		return
+	}
 	_ = os.RemoveAll(extractDir)
 	_ = os.Remove(tarball)
 	defer os.Remove(tarball)
@@ -273,7 +280,19 @@ func handlePanelUpdate(dataDir, hostData, feed string) http.HandlerFunc {
 		}
 		updateState.Unlock()
 		writeJSON(w, http.StatusOK, map[string]string{"started": "true", "tag": tag})
-		go runPanelUpdate(dataDir, hostData, feed, tag)
+		go func() {
+			defer func() {
+				if p := recover(); p != nil {
+					log.Printf("panel update: PANIC %v", p)
+					updateState.Lock()
+					updateState.Running = false
+					updateState.LastOK = false
+					updateState.LastErr = fmt.Sprintf("internal error: %v", p)
+					updateState.Unlock()
+				}
+			}()
+			runPanelUpdate(dataDir, hostData, feed, tag)
+		}()
 	}
 }
 
