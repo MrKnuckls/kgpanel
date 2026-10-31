@@ -197,15 +197,28 @@ func runPanelUpdate(dataDir, hostData, feed, tag string) {
 		finish(false, fmt.Errorf("read panel image ref: %w", err))
 		return
 	}
-	prevImg := curImg + "-previous"
+	// The RUNNING image may already be a rollback snapshot (kgpanel:db-previous
+	// after a rollback) — derive the canonical tag by stripping a trailing
+	// -previous chain so an update after a rollback still builds the real
+	// image name instead of re-tagging the snapshot as its own rollback
+	// target. snapshot to canonical-previous is a no-op when equal (running
+	// image IS the old snapshot), which is exactly right: the pre-update state
+	// is preserved as the new rollback target.
+	canonical := strings.TrimSuffix(curImg, "-previous")
+	for canonical != strings.TrimSuffix(canonical, "-previous") {
+		canonical = strings.TrimSuffix(canonical, "-previous")
+	}
+	prevImg := canonical + "-previous"
 
-	// 1. snapshot rollback target BEFORE touching anything
+	// 1. snapshot rollback target BEFORE touching anything: tag whatever is
+	//    currently RUNNING as the rollback image. If the panel already runs
+	//    the previous snapshot (post-rollback), this is a harmless no-op.
 	if docker.ImageExists(ctx, curImg) {
 		if err := docker.TagImage(ctx, curImg, prevImg); err != nil {
 			finish(false, fmt.Errorf("snapshot previous image: %w", err))
 			return
 		}
-		log.Printf("panel update: snapshotted %s -> %s", curImg, prevImg)
+		log.Printf("panel update: snapshot %s -> %s", curImg, prevImg)
 	}
 
 	// 2+3. download release source and build the panel image
@@ -240,15 +253,15 @@ func runPanelUpdate(dataDir, hostData, feed, tag string) {
 	// hostData translation is only needed for `docker run -v` mounts, which
 	// the daemon resolves. (hostDiskPath is used by RecreatePanelContainer.)
 	buildCtx := filepath.Join(dataDir, workRel)
-	log.Printf("panel update: building %s (VERSION=%s) from %s", curImg, tag, buildCtx)
-	if err := docker.BuildImage(ctx, buildCtx, "deploy/Dockerfile.panel", curImg, tag); err != nil {
+	log.Printf("panel update: building %s (VERSION=%s) from %s", canonical, tag, buildCtx)
+	if err := docker.BuildImage(ctx, buildCtx, "deploy/Dockerfile.panel", canonical, tag); err != nil {
 		finish(false, fmt.Errorf("docker build: %w", err))
 		return
 	}
 
 	// 4. recreate the container so the fresh image actually runs
-	log.Printf("panel update: recreating %s from %s", panelContainer, curImg)
-	if err := docker.RecreatePanelContainer(ctx, panelContainer, curImg); err != nil {
+	log.Printf("panel update: recreating %s from %s", panelContainer, canonical)
+	if err := docker.RecreatePanelContainer(ctx, panelContainer, canonical); err != nil {
 		finish(false, fmt.Errorf("recreate panel container: %w", err))
 		return
 	}
