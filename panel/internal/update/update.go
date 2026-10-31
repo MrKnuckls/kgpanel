@@ -42,6 +42,7 @@ type Status struct {
 	UpdateNeeded bool   `json:"update_needed"`
 	Asset        string `json:"asset,omitempty"`
 	Message      string `json:"message,omitempty"`
+	AutoUpdate   bool   `json:"auto_update"` // checked on a timer when enabled
 }
 
 func compName() string {

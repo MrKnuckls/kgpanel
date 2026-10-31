@@ -62,6 +62,7 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.Handle("/api/audit", s.auth(http.HandlerFunc(s.handleAudit)))
 	mux.Handle("/api/update/check", s.auth(http.HandlerFunc(s.handleUpdateCheck)))
 	mux.Handle("/api/update/status", s.auth(http.HandlerFunc(s.handleUpdateStatus)))
+	mux.Handle("/api/update/auto", s.auth(http.HandlerFunc(s.handleUpdateAuto)))
 	mux.Handle("/api/update", s.auth(http.HandlerFunc(s.handleUpdate)))
 	mux.Handle("/api/rollback", s.auth(http.HandlerFunc(s.handleRollback)))
 

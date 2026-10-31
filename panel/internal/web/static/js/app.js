@@ -732,6 +732,7 @@ async function loadUpdates() {
     const d = await jfetch("/update/check");
     const cur = d.current.replace(/^v/, ""), lat = d.latest.replace(/^v/, "");
     checkTxt = d.update_needed ? `update available: v${cur} → v${lat}` : `up to date — current v${cur} · latest release v${lat}`;
+    setUpdAutoBtn(d.auto_update);
   } catch (e) { checkTxt = "feed unreachable — " + e.message; }
   try {
     const st = await jfetch("/update/status");
@@ -751,6 +752,15 @@ async function loadUpdates() {
   } catch (e) { /* bare-metal: no wings status */ }
   el.textContent = checkTxt;
 }
+
+function setUpdAutoBtn(on) {
+  const b = $("updAuto");
+  if (!b) return;
+  b.textContent = "auto update: " + (on ? "on" : "off");
+  b.style.borderColor = on ? "rgba(57,211,83,.9)" : "rgba(57,211,83,.5)";
+  b.style.background = on ? "rgba(57,211,83,.15)" : "";
+  b.style.color = on ? "var(--green,#39d353)" : "var(--green,#39d353)";
+}
 async function pollUpdateStatus() {
   clearInterval(updPoll);
   updPoll = setInterval(async () => {
@@ -768,6 +778,15 @@ async function pollUpdateStatus() {
   }, 4000);
 }
 $("updCheck").addEventListener("click", loadUpdates);
+$("updAuto").addEventListener("click", async () => {
+  const on = $("updAuto").textContent.trim().endsWith(": on");
+  const el = $("updStatus"); el.textContent = on ? "turning auto update off…" : "turning auto update on…";
+  try {
+    const d = await jfetch("/update/auto", { method: "POST", body: JSON.stringify({ auto_update: !on }) });
+    setUpdAutoBtn(d.auto_update);
+    el.textContent = d.auto_update ? "auto update: on — the panel checks every 30 min and applies new releases itself" : "auto update: off — manual mode (you click check/apply)";
+  } catch (e) { el.textContent = "auto update toggle failed — " + e.message; }
+});
 $("updApply").addEventListener("click", async () => {
   if (!confirm("apply the update? wings will download the release, rebuild the panel image, and recreate the panel container — the panel restarts and you may briefly lose this page.")) return;
   const el = $("updStatus"); el.textContent = "starting update — waiting for wings…";

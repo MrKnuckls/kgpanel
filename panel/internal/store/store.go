@@ -104,6 +104,27 @@ type Store struct {
 	servers   map[string]*Server
 	schedules map[string]*Schedule
 	audit     []AuditEntry
+	settings  Settings
+}
+
+// Settings are panel-wide preferences persisted to settings.json.
+type Settings struct {
+	AutoUpdate bool `json:"auto_update"` // check the feed on a timer and apply new releases automatically
+}
+
+// GetSettings returns a copy of the persisted panel settings.
+func (s *Store) GetSettings() Settings {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.settings
+}
+
+// SetAutoUpdate persists the auto-update preference.
+func (s *Store) SetAutoUpdate(on bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.settings.AutoUpdate = on
+	return s.save("settings.json", s.settings)
 }
 
 func New(dir string) (*Store, error) {
@@ -135,6 +156,9 @@ func New(dir string) (*Store, error) {
 		return nil, err
 	}
 	if err := s.load("audit.json", &s.audit); err != nil {
+		return nil, err
+	}
+	if err := s.load("settings.json", &s.settings); err != nil {
 		return nil, err
 	}
 	return s, nil
