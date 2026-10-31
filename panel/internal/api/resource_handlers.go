@@ -125,6 +125,14 @@ func (s *Server) handleCreateServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// push the container spec to wings so it can create the container on start
+	// generate the SFTP password NOW (files are being created) so wings has it
+	// from day one — the /sftp details endpoint then just reads it back
+	pw, pwErr := s.st.EnsureSFTPPassword(in.ID)
+	if pwErr != nil {
+		log.Printf("sftp password gen %s: %v", in.ID, pwErr)
+	}
+	in.SFTPPassword = pw
+	_ = pwErr
 	s.pushServerConfig(&in, false)
 	s.st.Audit(in.OwnerID, "server_create", in.ID, in.Name)
 	writeJSON(w, http.StatusCreated, map[string]interface{}{"id": in.ID})
