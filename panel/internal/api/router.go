@@ -89,6 +89,7 @@ func (s *Server) gateUI(ui http.Handler) http.Handler {
 				page = index
 			}
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-cache") // shell must revalidate: the ?v= busts on css/js are how clients pick up new UI
 			_, _ = w.Write(page)
 			return
 		default:
