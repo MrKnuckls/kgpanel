@@ -235,9 +235,13 @@ func runPanelUpdate(dataDir, hostData, feed, tag string) {
 		return
 	}
 
-	hostCtx := hostDiskPath(dataDir, hostData, extractDir)
-	log.Printf("panel update: building %s (VERSION=%s) from %s", curImg, tag, hostCtx)
-	if err := docker.BuildImage(ctx, hostCtx, "deploy/Dockerfile.panel", curImg, tag); err != nil {
+	// docker build reads the context CLIENT-side (the CLI tars the dir and
+	// streams it to the daemon), so pass the container-visible path — the
+	// hostData translation is only needed for `docker run -v` mounts, which
+	// the daemon resolves. (hostDiskPath is used by RecreatePanelContainer.)
+	buildCtx := filepath.Join(dataDir, workRel)
+	log.Printf("panel update: building %s (VERSION=%s) from %s", curImg, tag, buildCtx)
+	if err := docker.BuildImage(ctx, buildCtx, "deploy/Dockerfile.panel", curImg, tag); err != nil {
 		finish(false, fmt.Errorf("docker build: %w", err))
 		return
 	}
